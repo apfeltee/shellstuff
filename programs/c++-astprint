@@ -1,0 +1,82 @@
+#!/usr/bin/ruby
+
+require 'open3'
+
+class ActiveProcess
+    def initialize(pstdin, pstdout, pstderr, pwait)
+        @stdin  = pstdin
+        @stdout = pstdout
+        @stderr = pstderr
+        @wait   = pwait
+    end
+
+    def kind
+        return :active_process
+    end
+
+    def stdin
+        return @stdin
+    end
+
+    def stdout
+        return @stdout
+    end
+
+    def stderr
+        return @stderr
+    end
+
+    def thread
+        return @wait
+    end
+
+    def pid
+        return thread.pid
+    end
+
+    def success?
+        return thread.value.success?
+    end
+end
+
+def shell(*args, &callback)
+    $stderr.puts("popen3(*#{args.inspect})")
+    Open3.popen3(*args) do |stdin, stdout, stderr, wait_thr|
+        if callback then
+            callback.call(ActiveProcess.new(stdin, stdout, stderr, wait_thr))
+        end
+    end
+end
+
+
+############################
+
+@gpp               = "g++"
+@clangpp           = "clang++"
+@def_gpp_flags     = %w(-std=c++11 -E -P)
+@def_clangpp_flags = %w(-cc1 -fcxx-exceptions -x c++ -std=c++11 -ast-print)
+
+
+if ARGV.length then
+    infile = ARGV.shift
+    shell(@gpp, *@def_gpp_flags, infile) do |gnupc|
+        processed = gnupc.stdout.read
+        if gnupc.success? then
+            shell(@clangpp, *@def_clangpp_flags, "-") do |clangpc|
+                clangpc.stdin.puts(processed)
+                clangpc.stdin.close
+                code = clangpc.stdout.read
+                if clangpc.success? then
+                    $stdout.puts(code)
+                    $stdout.flush
+                else
+                    $stderr.puts(clangpc.stderr.read)
+                end
+            end
+        else
+            $stderr.puts(gnupc.stderr.read)
+        end
+    end
+else
+    puts "usage: #$0 <infile> [<args>...]"
+end

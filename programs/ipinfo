@@ -1,0 +1,190 @@
+#!/bin/bash
+
+function err
+{
+  echo "$@" >&2
+}
+
+function erre
+{
+  echo -e "$@" >&2
+}
+
+function errn
+{
+  echo -n "$@" >&2
+}
+
+function erren
+{
+  echo -en "$@" >&2
+}
+
+function ipinfo_interrupted
+{
+  erre "\nreceived ^C, goodbye!"
+  exit 1
+}
+
+function util_indent
+{
+  echo -n "$g_indentvalue"
+  cat
+}
+
+function ipinfo_hint_nmap
+{
+  echo "  if you're running windows, you can download NMap from here:"
+  echo "  http://nmap.org/download.html"
+  echo "  and if you're running cygwin, symlinking the nmap binaries into your ~/bin directory"
+  echo "  will make them available to ipinfo"
+}
+
+function ipinfo_hint_host
+{
+  echo "  on cygwin, 'host' can be found in the bind-utils package"
+}
+
+function needscommands
+{
+  local ismissing=0
+  for shcomm in "$@"; do
+    if ! type "$shcomm" &>/dev/null; then
+      if ! which "$shcomm" &>/dev/null; then
+        err "command '$shcomm' is required, but could not be found!"
+        hintfunc="ipinfo_hint_${shcomm}"
+        if type "$hintfunc" &>/dev/null; then
+          eval "$hintfunc"
+        fi
+        ismissing=1
+      fi
+    fi
+  done
+  if [[ $ismissing == 1 ]]; then
+    err "some required commands are not available. before you can use ipinfo, fix the above problems"
+    err "first, and then try to re-run ipinfo!"
+  fi
+}
+
+function usage
+{
+  echo "usage: ipinfo [-w / -n] <ipaddr | hostname>"
+  echo
+  echo "recognized flags:"
+  echo "  -h / --help:"
+  echo "    show this help and exit"
+  echo
+  echo "  -d / --dig:"
+  echo "    include dig output. usually contains very little information."
+  echo "    default: disabled"
+  echo
+  echo "  -w / --whois:"
+  echo "    include whois output. could be moderately slow!"
+  echo "    default: disabled"
+  echo
+  echo "  -n / --nmap:"
+  echo "    include nmap output. warning: very slow!"
+  echo "    default: disabled"
+  echo
+}
+
+####
+#### program starts below
+####
+
+g_indentvalue="    "
+g_use_nmap=0
+g_use_whois=0
+g_use_dig=0
+
+function ipinfo_geoip
+{
+  local ipaddr="$1"
+  echo "  GeoIP Information:"
+  geoiplookup "$ipaddr" >&1 | util_indent
+}
+
+function ipinfo_host
+{
+  local ipaddr="$1"
+  echo "  Host Information:"
+  host "$ipaddr" >&1 | while read outputline; do
+    util_indent <<<"$outputline"
+  done
+}
+
+function ipinfo_nmap
+{
+  local ipaddr="$1"
+  if [[ $g_use_nmap == 1 ]]; then
+    echo "  NMap Information:"
+    nmap -PN "$ipaddr" >&1 | while read outputline; do
+      util_indent <<<"$outputline"
+    done
+  fi
+}
+
+function ipinfo_dig
+{
+  local ipaddr="$1"
+  if [[ $g_use_dig == 1 ]]; then
+    echo "  DIG Information:"
+    dig -t ANY "$ipaddr"  +noall +answer >&1 | while read outputline; do
+      util_indent <<<"$outputline"
+    done
+  fi
+}
+
+function ipinfo_whois
+{
+  local ipaddr="$1"
+  if [[ $g_use_whois == 1 ]]; then
+    echo "  Whois Information:"
+    whois "$ipaddr" >&1 | while read outputline; do
+      util_indent <<<"$outputline"
+    done
+  fi
+}
+
+function ipinfo_commence_magic
+{
+  local ipaddr="$1"
+  echo "Scanning '$ipaddr' ..."
+  ipinfo_geoip "$ipaddr"
+  ipinfo_host "$ipaddr"
+  ipinfo_whois "$ipaddr"
+  ipinfo_dig "$ipaddr"
+  ipinfo_nmap "$ipaddr"
+}
+
+# check needed commands first
+needscommands geoiplookup nmap host dig whois
+
+if [[ "$1" ]]; then
+  for cmdarg in "$@"; do
+    case "$cmdarg" in
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      -n | --nmap)
+        g_use_nmap=1
+        shift
+        ;;
+      -w | --whois)
+        g_use_whois=1
+        shift
+        ;;
+      -d | --dig)
+        g_use_dig=1
+        shift
+        ;;
+    esac
+  done
+  for ipaddr in "$@"; do
+    ipinfo_commence_magic "$ipaddr"
+  done
+else
+  usage
+  exit 1
+fi

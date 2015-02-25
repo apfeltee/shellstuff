@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+
+require 'tempfile'
+require "open3"
+
+class Icc
+  def initialize
+    @tmpfile = Dir::Tmpname.make_tmpname("/tmp/icc-result", ".bin")
+    @code = get_code
+    cmdline = ["gcc", "-xc", "-Wall", "-o", @tmpfile, "-"]
+    options =
+    {
+      :stdin_data => @code,
+      :binmode => true,
+    }
+    stdout, stderr, status = Open3.capture3(*cmdline, options)
+    if not status.success? then
+      puts "error:"
+      puts stderr
+    end
+    tryrunfile(stdout.chomp!)
+  end
+
+  def tryrunfile(stdout)
+    puts "stdout:\n#{stdout}" if stdout
+    if File.exist? @tmpfile then
+      system("env", @tmpfile)
+      File.unlink(@tmpfile)
+    end
+  end
+
+  def get_code
+    if ARGV.empty? then
+      $stdin.read
+    else
+      ARGV.join(" ")
+    end
+  end
+end
+
+Icc.new

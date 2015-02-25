@@ -1,0 +1,78 @@
+#!/usr/bin/env ruby
+
+require "open3"
+
+
+$EDITOR_LINUX = "/usr/bin/kate"
+$EDITOR_CYGWIN = "/cygdrive/c/Program Files (x86)/Notepad++/notepad++.exe" 
+$EDARGS = []
+
+def shell(*args, &callback)
+  Open3.popen3(*args) do |stdin, stdout, stderr|
+    if callback then
+      callback.call(stdin, stdout, stderr)
+    end
+  end
+end
+
+class OpenEditor
+  def is_cygwin
+    shell("uname", "-s") do |_, stdout, _|
+      return stdout.read.downcase.match(/cygwin/)
+    end
+  end
+
+  def is_virtual(path)
+    if path.match(/^(https?|ftp):/) then
+      return true
+    end
+    return false
+  end
+
+  def get_real_path(path)
+    # check whether it might be a virtual path (url?)
+    if @is_cygwin then
+      shell("cygpath", "-wa", path) do |stdin, stdout, stderr|
+        return stdout.read.strip
+      end
+    else
+      return path
+    end
+  end
+
+  def set_editor
+    if @is_cygwin then
+      @editor = $EDITOR_CYGWIN
+    else
+      @editor = $EDITOR_LINUX
+    end
+  end
+
+  def editall(paths)
+    $stderr.puts("shell(#{@editor.inspect}, *#{$EDARGS.inspect}, *#{paths.inspect})")
+    system(@editor, *($EDARGS + paths))
+  end
+
+  def initialize(argv)
+    @is_cygwin = is_cygwin
+    editme = []
+    set_editor
+    argv.each do |path|
+      if is_virtual(path) then
+        editme << path
+      elsif File.file?(realpath = get_real_path(path)) then
+        editme << realpath
+      else
+        warn("file #{realpath.inspect} does not exist!")
+      end
+    end
+    if editme.length > 0 then
+      editall(editme)
+    else
+      warn("nothing to do")
+    end
+  end
+end
+
+OpenEditor.new(ARGV)
+

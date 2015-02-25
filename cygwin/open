@@ -1,0 +1,5 @@
+#!/usr/bin/ruby
+
+ARGV.each do |arg|
+  system("cygstart", arg)
+end

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+nmap_dir="$HOME/opt/nmap"
+nmap_exe="$nmap_dir/nmap.exe"
+old_pwd="$PWD"
+
+cd "$nmap_dir" && exec "$nmap_exe" "$@"
