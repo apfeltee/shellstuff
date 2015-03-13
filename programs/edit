@@ -49,7 +49,11 @@ class OpenEditor
   end
 
   def editall(paths)
-    $stderr.puts("shell(#{@editor.inspect}, *#{$EDARGS.inspect}, *#{paths.inspect})")
+    #$stderr.puts("shell(#{@editor.inspect}, *#{$EDARGS.inspect}, *#{paths.inspect})")
+	$stderr.puts "calling #{[@editor, $EDARGS].inspect} with:"
+	paths.each do |pa|
+		$stderr.puts " + #{pa.inspect}"
+	end
     system(@editor, *($EDARGS + paths))
   end
 
@@ -58,12 +62,19 @@ class OpenEditor
     editme = []
     set_editor
     argv.each do |path|
+      realpath = get_real_path(path)
       if is_virtual(path) then
         editme << path
-      elsif File.file?(realpath = get_real_path(path)) then
+      elsif File.file?(realpath) then
         editme << realpath
       else
-        warn("file #{realpath.inspect} does not exist!")
+        if File.directory?(realpath) then
+          warn("file #{realpath.inspect} is a directory")
+        elsif not File.exist?(realpath) then
+          warn("file #{realpath.inspect} does not exist!")
+        else
+          warn("file #{realpath.inspect} cannot be opened because it is not a regular file")
+        end
       end
     end
     if editme.length > 0 then
