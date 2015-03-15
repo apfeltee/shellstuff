@@ -1,0 +1,3 @@
+#!/bin/bash
+
+powershell "$(cygpath -wa "$HOME/bin/_trash.ps1")" "$@"
