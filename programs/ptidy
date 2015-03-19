@@ -1,0 +1,28 @@
+#!/usr/bin/env php
+<?php
+
+$buffer = file_get_contents("php://stdin");
+$options =
+[
+    'hide-comments' => true,
+    'tidy-mark' => false,
+    'indent' => true,
+    'indent-spaces' => 4,
+    'new-blocklevel-tags' => 'article,header,footer,section,nav',
+    'new-inline-tags' => 'video,audio,canvas,ruby,rt,rp',
+    'new-empty-tags' => 'source',
+    'doctype' => '<!DOCTYPE HTML>',
+    'sort-attributes' => 'alpha',
+    'vertical-space' => false,
+    'output-xhtml' => true,
+    'wrap' => 180,
+    'wrap-attributes' => false,
+    'break-before-br' => false,
+];
+
+$buffer = tidy_parse_string($buffer, $options, 'utf8');
+tidy_clean_repair($buffer);
+// Fix a tidy doctype bug
+$buffer = str_replace('<html lang="en" xmlns="http://www.w3.org/1999/xhtml">', '<!DOCTYPE HTML>', $buffer);
+
+print($buffer . "\n");

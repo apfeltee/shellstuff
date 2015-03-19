@@ -1,0 +1,46 @@
+#!/usr/bin/env ruby
+
+require "pp"
+
+INITIAL_CURSEWORDS = %w(fuck shit crap damn bastard idiotic)
+
+=begin
+File.open("some.txt") do |fh|
+  fh.each_line.detect do |line|
+    /re/.match(line) 
+  end
+end
+=end
+
+class CurseWords
+  def initialize
+    @cursewords = INITIAL_CURSEWORDS
+    @opts = %w(-A3 -inP --color=always)
+    @realargs = []
+  end
+
+  def msg(str)
+    $stderr.puts("curse:msg: #{str}")
+  end
+
+  def run(argv)
+    if argv.length > 0 then
+      argv.each do |arg|
+        if m = arg.match(/^-w(.+)/) then
+          @cursewords << m[1]
+        else
+          @realargs << arg
+        end
+      end
+      cursepat = "(#{@cursewords.join("|")})"
+      cmd = ["rgrep", *@opts, cursepat, *@realargs]
+      msg "using pattern #{cursepat.inspect}"
+      msg "running #{cmd}, please be patient ..."
+      exec(*cmd)
+    else
+      puts "Usage: #$0 [-w<additional-curse-word>] <path>"
+    end
+  end
+end
+
+CurseWords.new.run(ARGV)

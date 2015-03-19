@@ -1,9 +1,0 @@
-#!/bin/bash
-
-pattern='(fuck|shit|cunt|retard|crap|damn|darn)'
-
-# -----------
-
-[[ "$1" ]] && where="$1" || where="."
-rgrep -niE --color=always "$pattern" "$where"
-#ack "$pattern" "$where"

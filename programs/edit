@@ -31,6 +31,9 @@ class OpenEditor
 
   def get_real_path(path)
     # check whether it might be a virtual path (url?)
+    if File.symlink?(path) then
+      path = File.readlink(path)
+    end
     if @is_cygwin then
       shell("cygpath", "-wa", path) do |stdin, stdout, stderr|
         return stdout.read.strip

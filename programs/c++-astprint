@@ -1,5 +1,7 @@
 #!/usr/bin/ruby
 
+# todo: propery rewrite (ActiveProcess seemed like a good idea at the time)...
+
 require 'open3'
 
 class ActiveProcess
