@@ -2,7 +2,7 @@
 
 require "pp"
 
-INITIAL_CURSEWORDS = %w(fuck shit crap damn bastard idiotic)
+INITIAL_CURSEWORDS = %w(fuck shit crap damn bastard idiot)
 
 =begin
 File.open("some.txt") do |fh|

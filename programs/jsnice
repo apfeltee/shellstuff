@@ -56,13 +56,14 @@ class JSNice
     $stderr.puts("sending #{data.length} bytes of code...")
     path = ("/beautify?" + queryfy(@settings))
     http = Net::HTTP.new(@uri.host, @uri.port)
-    @result = http.post(path, data,
-      {
-        'Content-Type'     => 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Origin'           => 'http://jsnice.org',
-        'X-Requested-With' => 'XMLHttpRequest',
-        'User-Agent'       => 'Mozilla/5.0 (Windows NT 6.1;) Gecko/20100101 Firefox/24.0',
-      }).body
+    response = http.post(path, data,
+    {
+      'Content-Type'     => 'application/x-www-form-urlencoded; charset=UTF-8',
+      'Origin'           => 'http://jsnice.org',
+      'X-Requested-With' => 'XMLHttpRequest',
+      'User-Agent'       => 'Mozilla/5.0 (Windows NT 6.1;) Gecko/20100101 Firefox/24.0',
+    })
+    @result = response.body
   end
 
   def post_file(path)

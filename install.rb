@@ -11,6 +11,9 @@ def symlink_home(file)
   realpath = File.join(ENV["PWD"], file)
   bindir = File.join(ENV["HOME"], "/bin")
   dest = File.join(bindir, File.basename(realpath))
+  if File.symlink?(dest) then
+    File.delete(dest)
+  end
   symlink_real(realpath, dest)
 end
 
@@ -27,12 +30,21 @@ def is_linux
 end
 
 def do_dir(name)
-  puts("Symlinking #{name} scripts ...")
+  puts("Symlinking #{name} scripts/programs ...")
   Dir.glob("#{name}/*").each do |file|
     symlink_home(file)
   end
 end
 
+
+## first "install" native programs...
+Dir.chdir "native" do
+  if system("make") then
+    system("make install")
+  end
+end
+
+## then, process scripts ...
 do_dir("programs")
 if is_cygwin then
   do_dir("cygwin")

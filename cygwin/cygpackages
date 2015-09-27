@@ -131,6 +131,8 @@ class CygPackages
   end
 
   def update(force = false)
+    totaluniq = 0
+    totalpkgs = 0
     @setupinis = get_inifiles
     @shortdesc_name = "sdesc:"
     if (force == true) && File.file?(@localconf) then
@@ -143,6 +145,9 @@ class CygPackages
       fh.puts
       # sure, I *could* use regular expressions. But, I can also parse it manually.
       @setupinis.each do |file|
+        pkgcount = 0
+        uniqcount = 0
+        $stderr.puts(" reading from #{file.inspect} ...")
         # easier to iterate manually
         lines = File.open(file, "rb").readlines
         # iterate over data ...
@@ -164,13 +169,17 @@ class CygPackages
                 # remove the doublequotes
                 desc = desc[1, desc.length - 2]
                 # all done!
-                fh.puts(":%s:\n    :description: %s\n\n" % [name, desc.inspect])
+                fh.puts(":#{name}:\n    :description: #{desc.inspect}\n\n")
+                pkgcount += 1
               end
             end
           end
         end
+        $stderr.puts("  retrieved #{pkgcount} packages")
+        totalpkgs += pkgcount
       end
       fh.puts("\n")
+      $stderr.puts("total count: #{totaluniq} unique packages (#{totalpkgs} packages)")
     end
   end
 end

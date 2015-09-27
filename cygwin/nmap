@@ -1,6 +1,6 @@
 #!/bin/bash
 
-nmap_dir="$HOME/opt/nmap"
+nmap_dir="/cygdrive/c/apps/devtools/nmap"
 nmap_exe="$nmap_dir/nmap.exe"
 old_pwd="$PWD"
 
