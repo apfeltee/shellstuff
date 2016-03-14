@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# alternatively:
+#find "$startdir" -type f | sed 's/.*\.//' | sort | uniq -c | sort -n
+#find "$startdir" -type f | grep -E ".*\.[a-zA-Z0-9]*$" | sed -e 's/.*\(\.[a-zA-Z0-9]*\)$/\1/' | sort | uniq -c | sort -n
+
+set -x
+find "$@" -type f | sed 's/.*\.//' | sort | uniq -c | sort -n

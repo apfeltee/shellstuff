@@ -63,6 +63,7 @@ function needscommands
   if [[ $ismissing == 1 ]]; then
     err "some required commands are not available. before you can use ipinfo, fix the above problems"
     err "first, and then try to re-run ipinfo!"
+	exit 1
   fi
 }
 

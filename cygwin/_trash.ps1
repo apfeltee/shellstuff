@@ -24,7 +24,7 @@ if($args.length -gt 0)
 {
     foreach($path in $args)
     {
-        $native = make-winpath($path)
+        $native = $path #make-winpath($path)
         $obj = $Shell.Namespace(0).ParseName($native)
         if($obj)
         {

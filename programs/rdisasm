@@ -1,0 +1,33 @@
+#!/usr/bin/ruby
+
+class FormatDisasm
+  def initialize(raw)
+    @out = $stdout
+    @raw = raw
+    process
+  end
+
+  def process()
+  # all of this is horrible and nonworking, hence why it's commented out
+=begin
+    lines = @raw.split("\n")
+    # == disasm: <RubyVM::InstructionSequence:foo@(pry)>======================
+    lines[0].gsub!(/=+/){|s| s.colorize(:green) }
+    lines[0].gsub!(/<(.*?)@(.*?)>/) { '<' + $1.colorize(:blue) + '@' + $2.to_s.colorize(:bold) + '>' }          
+    for i in 1..lines.length do
+      lines[i] = lines[i].to_s.colorize(:blue) # TODO: not the best way to do this
+      lines[i].gsub!(/^(.*?)(\s+)(.*?)(\s+)/) { $1 + $2 + $3.colorize(:cyan) + $4 }
+      lines[i].gsub!(/<(.*?):(.*?)>/) { '<' + $1.colorize(:light_blue) + ':' + $2 + '>' }
+    end
+    puts lines.join("\n")
+=end
+    @out << @raw
+  end
+end
+
+raw = $stdin.read
+code = sprintf("proc{\n%s\n}", raw)
+dis = RubyVM::InstructionSequence.disasm(eval(code))
+FormatDisasm.new(dis)
+
+

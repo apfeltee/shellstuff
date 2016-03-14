@@ -1,6 +1,18 @@
 #!/usr/bin/ruby
 
 def do_cygstart(shargs)
+  #p [:shargs, shargs]
+  if shargs.length == 1 then
+    arg = shargs[0]
+    if File.directory?(arg) || File.file?(arg) then
+      # get full, canonical path...
+      # readlink seems to work only sometimes for whatever reason
+      expanded = File.expand_path(arg)
+      newpath = %x{realpath -L #{arg.inspect}}.strip
+      #puts "restored #{arg.inspect} to #{newpath.inspect}"
+      shargs = [newpath]
+    end
+  end
   system("cygstart", *shargs)
 end
 
