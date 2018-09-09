@@ -1,5 +1,0 @@
-#!/bin/bash
-
-powershell="/cygdrive/c/Windows/System32/WindowsPowerShell/v1.0/powershell"
-exec "$powershell" -inputformat none "$@"
-

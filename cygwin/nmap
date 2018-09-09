@@ -1,7 +1,0 @@
-#!/bin/bash
-
-nmap_dir="/cygdrive/c/apps/devtools/nmap"
-nmap_exe="$nmap_dir/nmap.exe"
-old_pwd="$PWD"
-
-cd "$nmap_dir" && exec "$nmap_exe" "$@"

@@ -1,5 +1,0 @@
-#!/bin/bash
-
-for arg in "$@"; do
-  powershell "$(cygpath -wa "$HOME/bin/_trash.ps1")" "$(cygpath -wa "$arg")"
-done

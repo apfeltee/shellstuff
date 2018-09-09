@@ -1,3 +1,0 @@
-#!/usr/bin/env ruby
-
-load "#{ENV["HOME"]}/bin/_clangwrap.rb"

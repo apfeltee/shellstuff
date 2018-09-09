@@ -2,19 +2,21 @@
 
 def symlink_real(from, to)
   if not File.exists?(to) then
-    puts("  [ln] from %s to %s ..." % [from.inspect, to.inspect])
+    printf("  [ln] from %p to %p ...\n", from, to)
     File.symlink(from, to)
   end
 end
 
 def symlink_home(file)
-  realpath = File.join(ENV["PWD"], file)
   bindir = File.join(ENV["HOME"], "/bin")
-  dest = File.join(bindir, File.basename(realpath))
+  abspath = File.absolute_path(file)
+  basename = File.basename(abspath)
+  finalname = basename.gsub(/\.\w+$/, "")
+  dest = File.join(bindir, finalname)
   if File.symlink?(dest) then
     File.delete(dest)
   end
-  symlink_real(realpath, dest)
+  symlink_real(abspath, dest)
 end
 
 def get_os
