@@ -1,5 +1,17 @@
 #!/usr/bin/env ruby
 
+require "fileutils"
+
+$scriptpath = File.absolute_path(__dir__)
+
+def chdir(dir, &b)
+  Dir.chdir(File.join($scriptpath, dir), &b)
+end
+
+def glob(pat, &b)
+  Dir.glob(File.join($scriptpath, pat), &b)
+end
+
 def symlink_real(from, to)
   if not File.exists?(to) then
     printf("  [ln] from %p to %p ...\n", from, to)
@@ -9,6 +21,9 @@ end
 
 def symlink_home(file)
   bindir = File.join(ENV["HOME"], "/bin")
+  if not File.directory?(bindir) then
+    FileUtils.mkdir_p(bindir)
+  end
   abspath = File.absolute_path(file)
   basename = File.basename(abspath)
   finalname = basename.gsub(/\.\w+$/, "")
@@ -33,14 +48,14 @@ end
 
 def do_dir(name)
   puts("Symlinking #{name} scripts/programs ...")
-  Dir.glob("#{name}/*").each do |file|
+  glob("#{name}/*").each do |file|
     symlink_home(file)
   end
 end
 
 
 ## first "install" native programs...
-Dir.chdir "native" do
+chdir("native") do
   if system("make") then
     system("make install")
   end

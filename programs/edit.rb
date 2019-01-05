@@ -5,11 +5,12 @@ require "optparse"
 require "open3"
 require "find"
 
-# this will attempt to use your $EDITOR environment variable, or, if it fails,
-# uses notepad++.
-# you might want to change this (if you don't have notepad++, or don't want to set $EDITOR ...)
-#$EDITOR = ENV.fetch("EDITOR", "c:/progra~2/notepad++/notepad++.exe")
-$EDITOR = "c:/progra~2/notepad++/notepad++.exe"
+# this is dumb, but works for me. you might want to change it, though
+if not ENV["KDE_SESSION_UID"].nil? then
+  $EDITOR = "/usr/bin/kate"
+else
+  $EDITOR = "c:/progra~2/notepad++/notepad++.exe"
+end
 
 # this is where you can specify arguments that will be passed
 # to $EDITOR everytime.
@@ -66,7 +67,10 @@ class OpenEditor
 
   def get_realpath(path)
     begin
-      path = File.readlink(path)
+      tmp = File.readlink(path)
+      if File.exist?(tmp) then
+        path = tmp
+      end
     rescue
     end
     return File.realpath(path)

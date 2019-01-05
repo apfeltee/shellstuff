@@ -32,6 +32,16 @@ class ProgOpen
     vsystem("cygstart", "-v", *shargs)
   end
 
+  def impl_xdgopen(shargs)
+    shargs.each do |arg|
+      vsystem("xdg-open", arg)
+    end
+  end
+
+  def impl_kdeopen(shargs)
+    
+  end
+
   def add(args)
     args.each do |arg|
       # check if it's a file:/// url from chrome; for

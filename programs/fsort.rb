@@ -23,10 +23,9 @@ class BaseSort
 end
 
 class SortBySize
-  def initialize(opts)
-    super(opts)
+  def where
+    
   end
-   
 end
 
 SORTMETHODS = {

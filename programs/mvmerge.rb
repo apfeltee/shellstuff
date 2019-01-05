@@ -1,5 +1,21 @@
 #!/usr/bin/ruby
 
+=begin
+  if need be, and this were to be ported to say, C, or C++, then
+  you'd need to implement the following:
+
+    futils_mv(a, b)
+      moves $a to $b recursively. see also: mv(1)
+
+    futils_rmrf(a)
+      ReMoves $a Recursively by Force.
+      if $a does not exist, fail successfully (i.e., don't throw an error -
+      just acknowledge and move on).
+      if $a is a dir, walk $a, and delete the tree (but do not step past $a).
+      see also: rm(1), in particular the '-r' and '-f' flags
+
+=end
+
 require "ostruct"
 require "optparse"
 require "fileutils"
@@ -7,10 +23,26 @@ require "fileutils"
 class MVMergeProgram
   def initialize(opts)
     @opts = opts
+    @statself = nil
   end
 
-  def futils(sym, *args)
+  # just wraps FileUtils, so the -v flag takes action
+  def wrapfutils(sym, *args)
     return FileUtils.send(sym, *args, verbose: @opts.verbose)
+    #$stderr.printf("%s(%p)\n", sym, args)
+    #return FileUtils.send(sym, *args)
+  end
+
+  def futils_mv(src, dest)
+    begin
+      wrapfutils("mv", src, dest)
+    rescue => ex
+      $stderr.printf("ERROR: (%s) %s\n", ex.class.name, ex.message)
+    end
+  end
+
+  def futils_rmrf(path)
+    wrapfutils("rm_rf", path)
   end
 
   def error(fmt, *args)
@@ -22,24 +54,37 @@ class MVMergeProgram
     return File.basename(path)
   end
 
-  def rsync(src, dest)
-    #return system("rsync", "-av", src, dest) 
+  # in theory, this does roughly, sort-of, what `rsync -av <src> <dest>` does.
+  # but in a uh, less broken way (don't quote me on that)
+  def mergedirs(src, dest)
     realsrc = File.absolute_path(src)
     realdest = File.absolute_path(dest)
     srcbase = gbasename(src)
     srcdest = File.join(realdest, srcbase)
+    
     if not File.exist?(srcdest) then
-      futils("mv", src, srcdest)
+      futils_mv(src, srcdest)
     elsif File.file?(srcdest) then
-      error("destination %p is a file", srcdest)
-      return false
+      # fixme: this is a bogey - but also recursive logic:
+      #        will fail (sometimes?) when mergedirs is called recursively.
+      if File.stat(srcdest) == @statself then
+        error("cannot merge %p with itself\n", srcdest)
+      elsif @opts.force then
+        futils_mv(src, dest)
+      else
+        error("destination %p is a file", srcdest, realsrc)
+        return false
+      end
     elsif File.directory?(srcdest) then
       # this where we want to merge!!
       Dir.entries(realsrc).each do |item|
         next if item.match(/^\.\.?$/)
         realitem = File.join(realsrc, item)
-        if not rsync(realitem, srcdest) then
-          return false
+        #$stderr.printf("recursive: mergedirs(%p, %p)\n", realitem, srcdest)
+        if not mergedirs(realitem, srcdest) then
+          if not @opts.keepgoing then
+            return false
+          end
         end
       end
     else
@@ -51,16 +96,17 @@ class MVMergeProgram
 
   def do_merge(sources, dest)
     rc = 0
+    @statself = File.stat(dest)
     sources.each do |src|
       if File.directory?(src) then
-        if rsync(src, dest) then
-          futils("rm_rf", src)
+        if mergedirs(src, dest) then
+          futils_rmrf(src)
         else
           error("copy+merge of %p to %p failed?", src, dest)
           rc = 1
         end
       elsif File.file?(src) then
-        futils("mv", src, dest)
+        futils_mv(src, dest)
       else
         error("%p is neither a regular file, nor a directory", src)
         rc = 1
@@ -73,10 +119,18 @@ end
 begin
   opts = OpenStruct.new({
     verbose: true,
+    keepgoing: false,
+    force: false,
   })
   OptionParser.new{|prs|
     prs.on("-v", "--verbose", "show what's being done"){|_|
       opts.verbose = true
+    }
+    prs.on("-i", "--ignore-errors", "-k", "--keep-going", "in case of errors, keep going as long as possible"){|_|
+      opts.keepgoing = true
+    }
+    prs.on("-f", "--force", "force merge, including overwriting files"){|_|
+      opts.force = true
     }
   }.parse!
   if ARGV.empty? then
@@ -88,26 +142,18 @@ begin
   else
     destdir = ARGV.pop
     sources = ARGV
-    if File.directory?(destdir) then
-      MVMergeProgram.new(opts).do_merge(sources, destdir)
+    mmg = MVMergeProgram.new(opts)
+    if (sources.length == 1) && (File.exist?(destdir) == false) then
+      # in this case, act like ordinary mv
+      mmg.futils_mv(sources[0], destdir)
     else
-      $stderr.printf("not a directory: %p\n", destdir)
-      exit(1)
+      if File.directory?(destdir) then
+        mmg.do_merge(sources, destdir)
+      else
+        $stderr.printf("not a directory: %p\n", destdir)
+        exit(1)
+      end
     end
   end
 end
 
-=begin
-exit
-DEST="${@:${#@}}"
-ABS_DEST="$(cd "$(dirname "$DEST")"; pwd)/$(basename "$DEST")"
-
-for SRC in ${@:1:$((${#@} -1))}; do #(
-    cd "$SRC";
-    find . -type d -exec mkdir -p "${ABS_DEST}"/\{} \;
-    find . -type f -exec mv \{} "${ABS_DEST}"/\{} \;
-    find . -type d -empty -delete
-#)
-done
-
-=end

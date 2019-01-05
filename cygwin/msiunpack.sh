@@ -17,7 +17,12 @@ if [[ "$1" ]] && [[ "$2" ]]; then
   if [[ -f "$msifile" ]]; then
     realmsi="$(cygpath -wa "$msifile")"
     realdestdir="$(cygpath -wa "$destdir")"
-    if vexec "$msiexec_exe" /quiet /a "$realmsi" /qb TARGETDIR="$realdestdir"; then
+    #realdestdir="$destdir"
+    opwd="$PWD"
+    base="$(basename "$realmsi")"
+    mkdir -p "$realdestdir"
+    cd "$(dirname "$realmsi")"
+    if vexec "$msiexec_exe" /quiet /a "$base" /qb TARGETDIR="$realdestdir"; then
       echo "done: extracted to '$realdestdir'"
     else
       echo "extraction may have failed"

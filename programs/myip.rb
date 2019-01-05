@@ -3,7 +3,7 @@
 require "optionparser"
 
 def myipv4
-  system(*%w{dig +short myip.opendns.com @resolver1.opendns.com})
+  system(*%w{dig +short -4 myip.opendns.com @resolver1.opendns.com})
 end
 
 def myipv6
