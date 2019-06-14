@@ -1,3 +1,8 @@
-#!/bin/bash
+#!/usr/bin/ruby
+#exec "$@"
 
-exec "$@"
+begin
+  # cygstart --action=runas
+  cmd = ["cygstart", "--action=runas", *ARGV]
+  exec(*cmd)
+end

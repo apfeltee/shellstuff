@@ -2,12 +2,17 @@
 
 require "optionparser"
 
+def sys(*cmd)
+  #$stderr.printf("cmd=%p\n", cmd)
+  return system(*cmd)
+end
+
 def myipv4
-  system(*%w{dig +short -4 myip.opendns.com @resolver1.opendns.com})
+  sys(*%w{dig +short -4 myip.opendns.com @resolver1.opendns.com})
 end
 
 def myipv6
-  system(*%w{dig +short -6 myip.opendns.com aaaa @resolver1.ipv6-sandbox.opendns.com})
+  sys(*%w{dig +short -6 myip.opendns.com aaaa @resolver1.ipv6-sandbox.opendns.com})
 end
 
 begin

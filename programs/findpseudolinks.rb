@@ -102,7 +102,7 @@ class FindPseudo
       @ofmaybe = $stdout
     else
       if (@ofmaybe != "-") then
-        @fhmay = File.open(ofmaybe, "wb")
+        @fhmay = File.open(@ofmaybe, "wb")
       else
         $stderr.printf("error: options '-o' and '-m' cannot both have value '-'!\n")
         exit(1)

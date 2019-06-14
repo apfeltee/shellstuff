@@ -20,6 +20,10 @@ require "ostruct"
 require "optparse"
 require "fileutils"
 
+module FileAction
+  
+end
+
 class MVMergeProgram
   def initialize(opts)
     @opts = opts
@@ -69,11 +73,15 @@ class MVMergeProgram
       #        will fail (sometimes?) when mergedirs is called recursively.
       if File.stat(srcdest) == @statself then
         error("cannot merge %p with itself\n", srcdest)
-      elsif @opts.force then
-        futils_mv(src, dest)
       else
-        error("destination %p is a file", srcdest, realsrc)
-        return false
+        if (@opts.force == true) then
+          futils_mv(src, dest)
+        else
+          if @opts.skipexisting == false then
+            error("destination %p is a file", srcdest, realsrc)
+            return false
+          end
+        end
       end
     elsif File.directory?(srcdest) then
       # this where we want to merge!!
@@ -81,6 +89,9 @@ class MVMergeProgram
         next if item.match(/^\.\.?$/)
         realitem = File.join(realsrc, item)
         #$stderr.printf("recursive: mergedirs(%p, %p)\n", realitem, srcdest)
+        if File.directory?(realitem) then
+          realitem = (realitem + "/")
+        end
         if not mergedirs(realitem, srcdest) then
           if not @opts.keepgoing then
             return false
@@ -121,6 +132,7 @@ begin
     verbose: true,
     keepgoing: false,
     force: false,
+    skipexisting: false,
   })
   OptionParser.new{|prs|
     prs.on("-v", "--verbose", "show what's being done"){|_|
@@ -131,6 +143,9 @@ begin
     }
     prs.on("-f", "--force", "force merge, including overwriting files"){|_|
       opts.force = true
+    }
+    prs.on("-s", "--skip", "skip existing files"){|_|
+      opts.skipexisting = true
     }
   }.parse!
   if ARGV.empty? then

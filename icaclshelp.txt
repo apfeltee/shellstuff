@@ -1,0 +1,141 @@
+
+ICACLS name /save aclfile [/T] [/C] [/L] [/Q]
+    Speichert die DACLs fr die Dateien und Ordner mit bereinstimmendem
+    Namen zur sp„teren Verwendung mit "/restore" in der ACL-Datei.
+    SACLs, Besitzer oder Integrit„tsbezeichnungen werden nicht gespeichert.
+
+ICACLS Verzeichnis [/substitute SidOld SidNew [...]] /restore aclfile
+                   [/C] [/L] [/Q]
+    Wendet die gespeicherten ACLs auf die Dateien im Verzeichnis an.
+
+ICACLS name /setowner user [/T] [/C] [/L] [/Q]
+    ndert den Besitzer fr alle bereinstimmenden Namen. Diese Option
+    erzwingt keine nderung der Besitzrechte. Verwenden Sie dazu das
+    Hilfsprogramm "takeown.exe".
+
+ICACLS name /findsid Sid [/T] [/C] [/L] [/Q]
+    Findet alle bereinstimmenden Namen, die eine ACL enthalten,
+    in der die SID explizit erw„hnt wird.
+
+ICACLS name /verify [/T] [/C] [/L] [/Q]
+    Findet alle Dateien, deren ACL kein kanonisches Format aufweist
+    oder deren L„nge nicht mit der ACE-Anzahl bereinstimmt.
+
+ICACLS name /reset [/T] [/C] [/L] [/Q]
+    Ersetzt die ACLs fr alle bereinstimmenden Dateien durch standardm„áige
+    vererbte ACLs.
+
+ICACLS name [/grant[:r] Sid:perm[...]]
+       [/deny Sid:perm [...]]
+       [/remove[:g|:d]] Sid[...]] [/T] [/C] [/L] [/Q]
+       [/setintegritylevel Level:policy[...]]
+
+    /grant[:r] Sid:perm gew„hrt die angegebenen Benutzerzugriffsrechte.
+        Mit :r ersetzen die Berechtigungen alle zuvor gew„hrten expliziten
+        Berechtigungen. Ohne :r, werden die Berechtigungen beliebigen zuvor
+        gew„hrten expliziten Berechtigungen hinzugefgt.
+
+    /deny Sid:perm verweigert die angegebenen Benutzerzugriffsrechte explizit.
+        Eine explizit verweigerte ACE wird fr die angegebenen Berechtigungen
+        hinzugefgt, und die gleichen Berechtigungen in einer expliziten
+        Berechtigung werden entfernt.
+
+    /remove[:[g|d]] Sid entfernt alle Vorkommen gew„hrter Rechten fr diese
+        SID. Mit :g, werden alle Vorkommen von gew„hrten Rechten fr diese
+        entfernt. Mit :d, werden alle Vorkommen von verweigerten
+        Rechten fr diese SID entfernt.
+
+    /setintegritylevel [(CI)(OI)]Level fgt allen bereinstimmenden Dateien
+        explizit eine Integrit„ts-ACE hinzu. Die Ebene wird mit einem der
+        folgenden Werte angegeben:
+            L[ow]
+            M[edium]
+            H[igh]
+        Vererbungsoptionen fr die Integrit„ts-ACE k”nnen vor der Ebene
+        stehen und werden nur auf Verzeichnisse angewendet.
+
+    /inheritance:e|d|r
+        e - aktiviert die Vererbung.
+        d - deaktiviert die Vererbung und kopiert die ACEs.
+        r - entfernt alle vererbten ACEs.
+
+
+Hinweis:
+   SIDs k”nnen im numerischen Format oder als Anzeigenamen angegeben werden.
+   Fgen Sie beim numerischen Format ein * am Anfang der SID hinzu.
+
+    /T gibt an, dass dieser Vorgang fr alle bereinstimmenden
+        Dateien/Verzeichnisse ausgefhrt wird, die den im Namen angegebenen
+        Verzeichnissen untergeordnet sind.
+
+    /C gibt an, dass dieser Vorgang bei allen Dateifehlern fortgesetzt wird.
+        Fehlermeldungen werden weiterhin angezeigt.
+
+    /L gibt an, dass dieser Vorgang fr einen symbolischen Link
+        anhand seines Ziels ausgefhrt wird.
+
+    /Q gibt an, dass ICACLS Erfolgsmeldungen unterdrcken soll.
+
+    ICACLS beh„lt die kanonische Sortierung der ACE-Eintr„ge bei:
+            Explizite Verweigerungen
+            Explizite Berechtigungen
+            Vererbte Verweigerungen
+            Vererbte Berechtigungen
+
+    perm ist eine Berechtigungsmaske und kann in einem von zwei Formaten
+         angegeben werden:
+        Eine Folge von einfachen Rechten:
+                N - Kein Zugriff
+                F - Vollzugriff
+                M - nderungszugriff
+                RX - Lese- und Ausfhrungszugriff
+                R - Schreibgeschtzter Zugriff
+                W - Lesegeschtzter Zugriff
+                D - L”schzugriff
+        Eine in Klammern stehende kommagetrennte Liste von bestimmten Rechten:
+                DE - L”schen
+                RC - Lesesteuerung
+                WDAC - DAC schreiben
+                WO - Besitzer schreiben
+                S - Synchronisieren
+                AS - Systemsicherheitszugriff
+                MA - Maximal zul„ssig
+                GR - Allgemeiner Lesezugriff
+                GW - Allgemeiner Schreibzugriff
+                GE - Allgemeiner Ausfhrungszugriff
+                GA - Allgemeiner Zugriff (alle)
+                RD - Daten lesen/Verzeichnis auflisten
+                WD - Daten schreiben/Datei hinzufgen
+                AD - Daten anfgen/Unterverzeichnis hinzufgen
+                REA - Erweiterte Attribute lesen
+                WEA - Erweiterte Attribute schreiben
+                X - Ausfhren/Durchsuchen
+                DC - Untergeordnetes Element l”schen
+                RA - Attribute lesen
+                WA - Attribute schreiben
+        Die Vererbungsrechte k”nnen beiden Formaten vorangestellt werden
+        und werden nur auf Verzeichnisse angewendet:
+                (OI) - Objektvererbung
+                (CI) - Containervererbung
+                (IO) - Nur vererben
+                (NP) - Vererbung nicht verteilen
+                (I) - Vom bergeordneten Container vererbte Berechtigung
+
+Beispiele:
+
+        icacls c:\windows\* /save AclFile /T
+        - Speichert die ACLs fr alle Dateien unter "c:\windows"
+          und in den dazugeh”rigen Unterverzeichnissen in der ACL.
+
+        icacls c:\windows\ /restore AclFile
+        - Stellt die ACLs fr alle Dateien in der ACL-Datei wieder her,
+          die unter "c:\windows" und in den dazugeh”rigen Unterverzeichnissen
+          vorhanden sind.
+
+        icacls file /grant Administrator:(D,WDAC)
+        - Gew„hrt dem Benutzer mit Administratorrechten die Berechtigungen
+          "DAC l”schen" und "DAC schreiben" fr die Datei.
+
+        icacls file /grant *S-1-1-0:(D,WDAC)
+        - Gew„hrt dem durch die SID S-1-1-0 definierten Benutzer die
+          Berechtigungen "DAC l”schen" und "DAC schreiben" fr die Datei.

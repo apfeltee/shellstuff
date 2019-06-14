@@ -1,4 +1,11 @@
-#!/bin/bash
+#!/usr/bin/ruby
+
+require "ostruct"
+require "optparse"
+
+
+
+=begin
 
 ###
 LANG_ANS_YES='j'
@@ -69,4 +76,49 @@ else
   echo "usage: $0 [-t] <path>"
   echo "the '-t' flag enables recursively applying permissions"
 fi
+
+=end
+
+def cyg2win(path)
+  return IO.popen(["cygpath", "-wa", path]){|io| io.read }.strip
+end
+
+def icacls(path, opts)
+  winpath = cyg2win(path)
+  # icacls "D:\test" /grant John:(OI)(CI)F /T
+  cmd = ["icacls", winpath, "/c"]
+  #cmd.push("/g", sprintf("%s:f", opts.username), "/c")
+  cmd.push("/grant:r", sprintf("%s:(OI)(CI)F", opts.username))
+  if opts.recursive then
+    cmd.push("/t")
+  end
+  $stderr.printf("cmd: %s\n", cmd.map(&:dump).join(" "))
+  #system(*cmd)
+  IO.popen(cmd) do |io|
+    io.each_line do |ln|
+      ln.rstrip!
+      $stderr.printf("icacls: %s\n", ln)
+    end
+  end
+end
+
+begin
+  opts = OpenStruct.new({
+    username: ENV["USERNAME"],
+    recursive: false
+  })
+  OptionParser.new{|prs|
+    prs.on("-t", "-r", "--traverse", "traverse recursively"){
+      opts.recursive = true
+    }
+  }.parse!
+  if ARGV.empty? then
+    $stderr.printf("need something here\n")
+    exit(1)
+  else
+    ARGV.each do |item|
+      icacls(item, opts)
+    end
+  end
+end
 

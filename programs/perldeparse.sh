@@ -15,7 +15,7 @@ function deparse
   #
   # check 'perldoc B::Deparse' for other flags and what they do
   #
-  flags="-q,-d,-x1,-P,-si4"
+  flags="-q,-d,-x9,-p,-P,-si4"
   perl -MO=Deparse,$flags "$@"
 }
 

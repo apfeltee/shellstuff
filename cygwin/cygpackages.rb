@@ -37,7 +37,10 @@ class CygPackages
     @localconf = File.join(ENV["HOME"], "/.cygpackages.yml")
     @progname = File.basename($0)
     @we_just_updated = false
-    @searchboth = ((@opts.onlypkgname == false) && (@opts.onlydescript == false))
+    @searchboth = (
+      ((@opts.onlypkgname == false) && (@opts.onlydescript == false)) &&
+      ((@opts.findpkgname.empty? && opts.finddescript.empty?))
+    )
 
     # load config, regardless if it's being updated ...
     @confdata = get_localconf
@@ -84,8 +87,8 @@ arj                                   3.10.22-3
     $stderr.printf("-- %s\n", str)
   end
 
-  def main(prs, args)
-    success = false
+  def main(args)
+    success = 0
     packages = @confdata[:packages]
     pkgcount = packages.size
     rxflags = ((@opts.ignorecase == true) ? Regexp::IGNORECASE : 0)
@@ -101,20 +104,46 @@ arj                                   3.10.22-3
       end
     )
     msg("Searching %s of %d packages with each of %s ... ", prefix, pkgcount, rexes.map(&:inspect).join(", "))
+    if (not @opts.findpkgname.empty?) || (not @opts.finddescript.empty?) then
+      pkgnames = @opts.findpkgname.map{|s| Regexp.new(s, rxflags) }
+      descriptions = @opts.finddescript.map{|s| Regexp.new(s, rxflags) }
+      packages.each do |pkgname, data|
+        havepkgmatch = 0
+        havedescmatch = 0
+        sdesc = data[:sdesc]
+        ldesc = data[:ldesc]
+        if not descriptions.empty? then
+          descriptions.each do |rx|
+            if (((sdesc != nil) && sdesc.match?(rx)) || ((ldesc != nil) && ldesc.match?(rx))) then
+              havedescmatch += 1
+            end
+          end
+        end
+        if not pkgnames.empty? then 
+          pkgnames.each do |rx|
+            if pkgname.match?(rx) then
+              havepkgmatch += 1
+            end
+          end
+        end
+        if ((not pkgnames.empty?) && (havepkgmatch > 0)) && ((not descriptions.empty?) && (havedescmatch > 0)) then
+          print_data(pkgname, data)
+          success += 1
+        end
+      end
+    end
     rexes.each do |rx|
       packages.each do |pkgname, data|
         if is_match(rx, pkgname, data) then
           print_data(pkgname, data)
-          success = true
+          success =+ 1
         end
       end
     end
-    if not success then
-      msg("nothing found (searched %d packages)", pkgcount)
-    end
+    msg("found: %s (searched %d packages)", ((success == 0) ? "nothing" : success.to_s), pkgcount)
   end
 
-  def is_match(rx, pkgname, data)
+  def is_match(rx, pkgname, data, onlydesc: false, onlypkg: false)
     rt = false
     name = pkgname.to_s.downcase
     sdesc = data[:sdesc].downcase
@@ -122,16 +151,18 @@ arj                                   3.10.22-3
     #$stderr.printf("pkgname=%p, data=%p\n", name, data)
     # if neither -p nor -d specified, search both name and description
     if @searchboth then
-      if (name.match(rx) || (ldesc.match(rx) || sdesc.match(rx))) then
+      if (name.match?(rx) || (ldesc.match?(rx) || sdesc.match?(rx))) then
         rt = true
       end
     else
-      if (@opts.onlypkgname == true) && name.match(rx) then
+      if ((@opts.onlypkgname == true) || (onlypkg == true)) && name.match?(rx) then
+        $stderr.printf("found match for pkgname %p\n", name)
         rt = true
-      elsif (@opts.onlydescript == true) && (ldesc.match(rx) || sdesc.match(rx)) then
+      elsif ((@opts.onlydescript == true) || (onlydesc == true)) && (ldesc.match?(rx) || sdesc.match?(rx)) then
+        $stderr.printf("found match for description %p | %p\n", ldesc, sdesc)
         rt = true
       end
-      # no else, just fall through
+
     end
     if @opts.wantinstalled then
       rt = @installedpkgs.include?(name)
@@ -315,16 +346,24 @@ begin
     onlypkgname: false,
     onlydescript: false,
     wantinstalled: false,
+    findpkgname: [],
+    finddescript: [],
   })
   prs = OptionParser.new{|prs|
     prs.on("-u", "--update", "update local configuration"){|_|
       opts.want_update = true
     }
-    prs.on("-p", "--pkgname", "search only package names"){|_|
+    prs.on("-P", "--pkgname", "search only package names"){|_|
       opts.onlypkgname = true
     }
-    prs.on("-d", "--description", "search only descriptions"){|_|
+    prs.on("-D", "--description", "search only descriptions"){|_|
       opts.onlydescript = true
+    }
+    prs.on("-p<str>", "--pkgname=<str>", "search package names matching <str> (regex)"){|v|
+      opts.findpkgname.push(v)
+    }
+    prs.on("-d<str>", "--description=<str>", "search package descriptions matching <str> (regex)"){|v|
+      opts.finddescript.push(v)
     }
     prs.on("-c", "--casesensitive", "search case-sensitively (default is icase)"){|_|
       opts.ignorecase = false
@@ -335,11 +374,11 @@ begin
   }
   prs.parse!
   cygp = CygPackages.new(opts)
-  if ARGV.empty? then
+  if ARGV.empty? && (opts.findpkgname.empty? && opts.finddescript.empty?) then
     $stderr.printf("ERROR: not enough arguments\n")
     exit(1)
   else
-    cygp.main(prs, ARGV)
+    cygp.main(ARGV)
   end
 end
 

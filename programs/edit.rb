@@ -5,8 +5,21 @@ require "optparse"
 require "open3"
 require "find"
 
+
+
+if ENV["EDITOR"] != nil then
+  enved = ENV["EDITOR"]
+  thisfile = File.stat(File.realpath(__FILE__))
+  if File.stat(enved) == thisfile then
+    $stderr.puts(
+      "ERROR: environment var $EDITOR points to this file, which is a recursive situation!\n",
+      "it must point to a different program / script.",
+    )
+    exit(1)
+  end
+  $EDITOR = enved
 # this is dumb, but works for me. you might want to change it, though
-if not ENV["KDE_SESSION_UID"].nil? then
+elsif not ENV["KDE_SESSION_UID"].nil? then
   $EDITOR = "/usr/bin/kate"
 else
   $EDITOR = "c:/progra~2/notepad++/notepad++.exe"

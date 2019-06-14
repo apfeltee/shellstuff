@@ -16,28 +16,13 @@ def error(fmt, *args)
   exit(1)
 end
 
-class BaseSort
-  def initialize(opts)
-    @opts = opts
-  end
-end
+=begin
+fext: .swf
+player: c:/cloud/gdrive/portable/flashplayer.exe
 
-class SortBySize
-  def where
-    
-  end
-end
 
-SORTMETHODS = {
-  "size" => SortBySize,
-}
+=end
 
-def get_method(name)
-  if not SORTMETHODS.key?(name) then
-    error("no sorting method named %p", name)
-  end
-  return SORTMETHODS[name]
-end
 
 begin
   opts = OpenStruct.new({
