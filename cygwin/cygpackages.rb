@@ -156,10 +156,10 @@ arj                                   3.10.22-3
       end
     else
       if ((@opts.onlypkgname == true) || (onlypkg == true)) && name.match?(rx) then
-        $stderr.printf("found match for pkgname %p\n", name)
+        #$stderr.printf("found match for pkgname %p\n", name)
         rt = true
-      elsif ((@opts.onlydescript == true) || (onlydesc == true)) && (ldesc.match?(rx) || sdesc.match?(rx)) then
-        $stderr.printf("found match for description %p | %p\n", ldesc, sdesc)
+      elsif (@opts.onlydescript || onlydesc) && (ldesc.match?(rx) || sdesc.match?(rx)) then
+        #$stderr.printf("found match for description %p | %p\n", ldesc, sdesc)
         rt = true
       end
 

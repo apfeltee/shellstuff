@@ -85,16 +85,18 @@ class MVMergeProgram
       end
     elsif File.directory?(srcdest) then
       # this where we want to merge!!
-      Dir.entries(realsrc).each do |item|
-        next if item.match(/^\.\.?$/)
-        realitem = File.join(realsrc, item)
-        #$stderr.printf("recursive: mergedirs(%p, %p)\n", realitem, srcdest)
-        if File.directory?(realitem) then
-          realitem = (realitem + "/")
-        end
-        if not mergedirs(realitem, srcdest) then
-          if not @opts.keepgoing then
-            return false
+      if File.directory?(realsrc) then
+        Dir.entries(realsrc).each do |item|
+          next if item.match(/^\.\.?$/)
+          realitem = File.join(realsrc, item)
+          #$stderr.printf("recursive: mergedirs(%p, %p)\n", realitem, srcdest)
+          if File.directory?(realitem) then
+            realitem = (realitem + "/")
+          end
+          if not mergedirs(realitem, srcdest) then
+            if not @opts.keepgoing then
+              return false
+            end
           end
         end
       end
@@ -129,7 +131,7 @@ end
 
 begin
   opts = OpenStruct.new({
-    verbose: true,
+    verbose: false,
     keepgoing: false,
     force: false,
     skipexisting: false,

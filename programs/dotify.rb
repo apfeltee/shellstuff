@@ -20,18 +20,30 @@ end
 def dotify(path, replacementchar)
   dir = File.dirname(path)
   base = File.basename(path)
-  newbase = base.gsub(/[\'\"\(\)\[\]\{\}]/, "").gsub(/[^a-z0-9\-\.]/i, replacementchar)
-  #msg("pre-while: newbase=%p\n", newbase)
-  while ((newbase[0] == replacementchar) || (newbase[0] == ".")) do
-    newbase = newbase[1 .. -1]
+  if File.file?(path) then
+  ext = File.extname(base)
+  stem = File.basename(base, ext)
+  else
+    stem = base
+  end
+  newstem = stem.gsub(/[\'\"\(\)\[\]\{\}]/, "").gsub(/[^a-z0-9\-\_\.]/i, replacementchar)
+  while ((newstem[0] == replacementchar) || (newstem[0] == ".")) do
+    newstem = newstem[1 .. -1]
   end
   dupstr = (replacementchar * 2)
   dupre = Regexp.new(Regexp.quote(dupstr))
-  while newbase.include?(dupstr) do
-    newbase.gsub!(dupre, replacementchar)
+  while newstem.include?(dupstr) do
+    newstem.gsub!(dupre, replacementchar)
   end
-  if newbase.empty? then
+  if newstem.empty? then
     raise ArgumentError, sprintf("dotifying %p (of %p) resulted in an empty string!", base, path)
+  end
+  newstem.gsub!(/\.-\./, ".")
+  
+  newbase = if File.file?(path) then
+    (newstem + ext)
+  else
+    newstem
   end
   return File.join(dir, newbase)
 end
@@ -57,18 +69,17 @@ class Prog
     if isdotp(path) then
       return path
     end
-    msg("renaming %p ", path)
     newpath = path
-    begin
-      newpath = dotify(path, @repchar)
-      if File.exist?(newpath) then
-        if File.stat(path) == File.stat(newpath) then
-          #raise Errno::EEXIST, sprintf("destination and source are the same")
-          msg("- nothing to do")
-          return path
-        end
+    newpath = dotify(path, @repchar)
+    if File.exist?(newpath) then
+      if File.stat(path) == File.stat(newpath) then
+        # nothing to do!
+        #raise Errno::EEXIST, sprintf("destination and source are the same")
+        return path
       end
-      msg("to %p ... ", newpath)
+    end
+    msg("renaming %p to %p ... ", path, newpath)
+    begin
       if not @pretend then
         if File.exist?(newpath) then
           if not @force then

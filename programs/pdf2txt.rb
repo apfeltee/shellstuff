@@ -7,10 +7,13 @@ require "pdf/reader"
 
 def pdf_to_text(file, opts)
   browser = PDF::Reader.new(file)
-  browser.pages.each_with_index do |page, i|
-    text = page.text rescue "<<ERROR>>"
-    text.strip! if opts.striptext
-    opts.out.puts(text)
+  begin
+    browser.pages.each_with_index do |page, i|
+      text = page.text rescue "<<ERROR>>"
+      text.strip! if opts.striptext
+      opts.out.puts(text)
+    end
+  rescue => ex
   end
 end
 

@@ -91,10 +91,13 @@ class Nargs
       pid = 0
       #pid = fork do
         #Process.exec(com, *args)
-        system(com, *args)
+        if not system(com, *args) then
+          #$stderr.printf("failed to spawn %p\n", com)
+          #exit(1)
+        end
       #end
 #=end
-    $stderr.printf("after spawning\n")
+    #$stderr.printf("after spawning\n")
     return pid
     end
   end
@@ -187,7 +190,8 @@ class Nargs
     mustchdir = false
     begin
       @io.each_line(@linesep) do |line|
-        val = bstrip(line)
+        #val = bstrip(line)
+        val = line[0 .. -2]
         if val.empty? then
           if @opts.skipemptylines then
             next

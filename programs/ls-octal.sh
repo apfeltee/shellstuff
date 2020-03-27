@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ls -l --color=always "$@" | awk '{
+ls -l --color=auto "$@" | awk '{
     octal_perm = 0;
     for(i=0; i<=8; i++)
     {

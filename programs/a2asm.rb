@@ -72,7 +72,7 @@ begin
     vendor: "intel",
   }
   prs = OptionParser.new{|prs|
-    prs.on("-v<vendor>", "--vendor=<vendor>", "select <vendor> as instruction set"){|v|
+    prs.on("-v<vendor>", "--vendor=<vendor>", "select <vendor> as instruction set (intel, amd, cyrix, idt)"){|v|
       opts[:vendor] = v
     }
     prs.on("-b<bits>", "--cpu=<bits>", "use <bits> as cpu mode (e.g., 16, 32, 64. default is 32)"){|v|
@@ -89,9 +89,10 @@ begin
   prs.parse!
   begin
     if ARGV.empty? then
-      if not $stdin.tty? then
+      if not $stdout.tty? then
         file2asm("-", opts, &outputter)
       else
+        $stderr.puts("no arguments given!")
         puts(prs.help)
       end
     else

@@ -6,6 +6,7 @@ MAPPING = {
   image: %w(.jpg .jpeg .png .gif .bmp .tga),
 }
 
+IMGTOSIXELEXE = "C:/cloud/local/code/libs/libsixel/converters/.libs/img2sixel.exe"
 
 def shellout(command)
   IO.popen(command) do |io|
@@ -53,7 +54,7 @@ module Handlers
     dims = TermDim.new
     width = dims.width * 6
     height = dims.height * 6
-    cmd = ["img2sixel", farg,
+    cmd = [IMGTOSIXELEXE, farg,
       "-S",
       #"-q", "low",
       "-E", "fast",

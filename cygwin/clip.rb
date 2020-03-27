@@ -85,7 +85,7 @@ class Clipboard
         end
         chunksz = write_chunk(inhandle, fh, chunk)
         writtenbytes += chunksz
-        verbose("chunk of %d bytes", chunksz)
+        verbose("[%-05db]: %p", chunksz, chunk)
       end
     end
     log("wrote %d bytes in total", writtenbytes)

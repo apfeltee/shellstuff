@@ -22,7 +22,7 @@ if ENV["EDITOR"] != nil then
 elsif not ENV["KDE_SESSION_UID"].nil? then
   $EDITOR = "/usr/bin/kate"
 else
-  $EDITOR = "c:/progra~2/notepad++/notepad++.exe"
+  $EDITOR = "c:/progra~1/notepad++/notepad++.exe"
 end
 
 # this is where you can specify arguments that will be passed

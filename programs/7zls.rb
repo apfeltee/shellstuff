@@ -2,6 +2,7 @@
 
 require "ostruct"
 require "optparse"
+require "open3"
 require "pp"
 require "json"
 
@@ -30,6 +31,8 @@ class Item
 
   def initialize(data)
     @data = data
+    @data_folder = @data["folder"]
+    @data_size = @data["size"]
     @attribs = (
       if @data.key?("attributes") then
         @data["attributes"].chars
@@ -47,11 +50,21 @@ class Item
   end
 
   def _isfile
-    return ((not @attribs.include?("D")) && (@data["folder"] == "-"))
+    if @data_folder != nil then
+      return (
+        #(not @attribs.include?("d")) &&
+        (@data["folder"] == "-")
+      )
+    end
+    return (@data_size != nil)
   end
 
   def _isdir
-    return ((@attribs.include?("D")) && (@data["folder"] == "+"))
+    return (
+      #(@attribs.include?("d")) &&
+      (@data["folder"] == "+") #&&
+      #(@data["size"] == "-")
+    )
   end
 
   def [](key)
@@ -127,19 +140,26 @@ def parse(chunk)
       exit
     end
   end
-  #if not data["attributes"] then
-    #complain("'attributes' field missing", nil, nil, nil, chunk, data)
-    #data["attributes"] = ""
-  #end
   return Item.new(data)
 end
 
 def do7zlist(file, opts, &b)
-  IO.popen([opts.exe, "l", "-ba", "-slt", file]) do |iofh|
-    iofh.read.gsub(/\0/, "").scrub.split(/\n\n/).each do |chunk|
-      b.call(parse(chunk))
+
+  realcmd = [opts.exe, "l", "-ba", "-slt", file]
+  Open3.popen2(*realcmd) do |stdin, stdout, wait_thr|
+    chunk = []
+    stdin.close
+    stdout.each_line do |ln|
+      ln.strip!
+      if ln.empty? && (chunk.size > 0) then
+        b.call(parse(chunk.join("\n")))
+        chunk = []
+      else
+        chunk.push(ln)
+      end
     end
   end
+
 end
 
 def outformat(item, ofile, opts)
@@ -148,22 +168,34 @@ end
 
 def filemain(file, opts)
   cache = []
+  cnt = 0
   filehnd = nil
   if opts.outfile then
     filehnd = File.open(opts.outfile, "wb")
   end
   ofile = (filehnd || $stdout)
+  printstatus = false #($stdin.tty? == true)
+  
   begin
     do7zlist(file, opts) do |item|
+      $stderr.printf("do7zlist: #%d ...\r", cnt) if printstatus
+      cnt += 1
       next if (item.file? && opts.excludefiles)
       next if (item.directory? && opts.excludedirs)
       if opts.json then
         cache.push(item.data)
       else
         outformat(item, ofile, opts)
+        begin
+          ofile.flush
+        rescue Errno::EPIPE
+          printnl = false
+          exit(0)
+        end
       end
     end
   ensure
+    $stderr.printf("\n") if printstatus
     if opts.json then
       ofile.write(JSON.pretty_generate(cache))
     end
@@ -208,8 +240,6 @@ begin
     if (opts.excludedirs && opts.excludefiles) then
       # uhh...
     end
-    #file = ARGV.shift
-    #filemain(file, opts)
     ARGV.each do |file|
       filemain(file, opts)
     end
