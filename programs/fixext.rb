@@ -102,9 +102,23 @@ SUSPICIOUS_EXTENSIONS = %w(
 ####
 ## regular expressions to match source files
 ####
-RX_CFILE   = /^\s*#\s*\b(define|include|pragma|if(n?def)|else|elifn?def|endif)\b/
-RX_PASFILE =  /^\s*\b(program|unit)\b\s*[\w\.]+(\s*\(.*\))?\s*;/i
-RX_XML     = /<\?\bxml\b/
+RX_CFILE   = (/
+  ^\s*\#\s*\b(define|include|pragma|if(n?def)|else|elifn?def|endif)\b
+/)
+
+# pascal file
+RX_PASFILE =  rx = /
+  (^\s*\b(program|unit)\b\s*[\w\.]+(\s*\(.*\))?\s*;)|
+  (\s*=\s*\brecord\b)
+/ix
+
+# html files
+RX_HTML = /<\w+\s*\w+\s*=["'].*['"]>/i
+
+# xml files
+RX_XML     = /<\?\bxml\b/i
+
+
 
 ## this mapping is used to check when suspicious extensions are encountered
 REGEXES = {
@@ -316,14 +330,18 @@ class FixExtensions
     if (oldwasnil == false) && ((@opts.assumenoext != true) && (@opts.force != true)) then
       return nil
     end
+    ## do shebang check -- shebangs can only be valid if they
+    ## appear on the very first line!
+    ## the file may also be empty.
+    firstline =  File.open(filepath, "rb"){|fh| fh.readline }.scrub rescue ""
     SHEBANGS.each do |rx, mimekey|
-      File.foreach(filepath) do |ln|
-        if ln.scrub.match?(rx) then
-          $stderr.printf("in get_ext_by_regex: file %p: SHEBANGS: line %p matches %p\n", filepath, ln, rx)
-          return @extmap[mimekey]
-        end
+      if firstline.match?(rx) then
+        $stderr.printf("in get_ext_by_regex: file %p: SHEBANGS: line %p matches %p\n", filepath, firstline, rx)
+        return @extmap[mimekey]
       end
     end
+
+    ## waltz through the other regexes
     REGEXES.each do |rx, mimekey|
       File.foreach(filepath) do |ln|
         if ln.scrub.match?(rx) then

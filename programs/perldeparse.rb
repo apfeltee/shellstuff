@@ -1,17 +1,17 @@
 #!/usr/bin/ruby
 
-# i really, REALLY do not like perl.
+# i really, REALLY do not like perl. but it also feels wrong to do this in ruby.
 #
+require "optparse"
+
 # check 'perldoc B::Deparse' for other flags and what they do
-#
+# these options are for B::Deparse(), that is, they get forwarded
 DEFOPTIONS = [
   ["-q", ["-q", "--qstrings"], "expands double-quoted strings"],
   ["-d", ["-d", "--dump"], "dumps data values when they're used as constants (such as strings)"],
   ["-p", ["-p", "--parens"], "adds additional parentheses"],
   ["-P", ["-n", "--noproto"], "disables prototype checking"],
 ]
-
-require "optparse"
 
 def deparse(opts, fh)
   sflags = opts.join(",")

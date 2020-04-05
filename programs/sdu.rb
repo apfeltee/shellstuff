@@ -34,7 +34,6 @@ module Util
   end
 
   def self.get_directory_size(path)
-    #return self.get_directory_size_extern(path)
     return self.get_directory_size_ruby(path)
   end
 
@@ -61,7 +60,7 @@ class SortedDU
     return Util.get_directory_size_ruby(path)
   end
 
-  def add(name, path)
+  def add(name, path, justafile=false)
     #$stderr.printf("add(%p, %p)\n", name, path)
     if (@opts.globpattern != nil) then
       if not File.fnmatch(@opts.globpattern, name, File::FNM_CASEFOLD) then
@@ -70,7 +69,7 @@ class SortedDU
     end
     begin
       sz = File.stat(path).size
-      if File.directory?(path) then
+      if (not justafile) && File.directory?(path) then
         sz = get_dir_size(path)
       end
       ###
@@ -166,13 +165,34 @@ begin
     prs.on("-g<pattern>", "--glob=<pattern>", "search for glob <pattern>"){|str|
       opts.globpattern = str
     }
+    prs.on("-i", "--stdin", "also read paths from stdin"){
+      opts.readstdin = true
+    }
   }.parse!
   sdu = SortedDU.new(opts)
   begin
-    if ARGV.empty? then
-      sdu.search(".")
+    args = ARGV
+    ##
+    ## outline:
+    ## only implicitly add "." if argv empty AND not reading from stdin
+    ##
+    if opts.readstdin then
+      $stdin.each_line do |ln|
+        ln.strip!
+        next if ln.empty?
+        sdu.add(File.basename(ln), ln, true)
+      end
     else
-      ARGV.each do |arg|
+      if args.empty? then
+        args.push(".")
+      end
+    end
+    if (args.empty?) && (not opts.readstdin) then
+      $stderr.printf("no arguments given - try '--help'\n")
+      exit(1)
+    end
+    if not args.empty? then
+      args.each do |arg|
         if File.exist?(arg) then
           if File.directory?(arg) then
             sdu.search(arg)

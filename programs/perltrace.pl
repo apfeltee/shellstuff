@@ -1,5 +1,7 @@
 #!/usr/bin/perl -d:DumpTrace
 
+# this is a really weird hack, that lets you trace perl.
+# obviously needs Devel::DumpTrace.
 
 BEGIN {
     use Devel::DumpTrace;
@@ -11,9 +13,9 @@ BEGIN {
 }
 
 
-#no warnings 'uninitialized';
-use strict;
-use warnings;
+no warnings 'uninitialized';
+#use strict;
+#use warnings;
 #use autodie;
 #use diagnostics;
 use Devel::DumpTrace;
@@ -82,15 +84,16 @@ sub __main__
         $isfile = 1;
         $input = shift(@ARGV);
     }
+    if(!defined($input))
+    {
+        printf("usage: perltrace <scriptfile> <scriptarguments>...\n");
+        exit(1);
+    }
     if(defined($logfile))
     {
         #$Devel::DumpTrace::DUMPTRACE_COLOR = undef;
         #$Devel::DumpTrace::DUMPTRACE_RESET = undef;
         open($Devel::DumpTrace::DUMPTRACE_FH, '>', $logfile) or die(sprintf("cannot open %s for writing", $logfile));
-    }
-    else
-    {
-
     }
     my @newargv = @ARGV;
     _wrap($isfile, $input, $level, \@newargv);

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+## todo: probably maybe rewrite in perl?
+
 if [[ $1 ]]; then
   filename="$1"; shift
   set -x

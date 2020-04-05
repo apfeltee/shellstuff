@@ -14,6 +14,9 @@ def procitem(name, recv, *args, &b)
     recv.call(*args)
   rescue => ex
     $stderr.printf("failed: (%s) %s", ex.class.name, ex.message)
+    if ex.class.name.match?(/^Errno::/) then
+      return true
+    end
     return false
   else
     $stderr.print("ok")
@@ -105,7 +108,9 @@ def handle(dir)
             sfile = File.join(path, sfbase)
           end
           if moveto(dir, sfbase, sfile, ".") then
-            deldir(dir, path)
+            if Dir.empty?(path) then
+              deldir(dir, path)
+            end
           end
           ci += 1
         end
