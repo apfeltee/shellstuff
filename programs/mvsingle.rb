@@ -143,6 +143,7 @@ class Deep
 end
 
 begin
+  $stdout.sync = true
   dodeep = false
   OptionParser.new{|prs|
     prs.on("-h", "--help", "show this help and exit"){

@@ -3,6 +3,8 @@
 require "optparse"
 require "ostruct"
 require "shellwords"
+require "readline"
+require "pty"
 
 WSPACE = [" ", "\t", "\v", "\r", "\n", "\f"]
 
@@ -19,6 +21,7 @@ DEFAULT_OPTIONS = {
   cutsep: "\t",
   docut: false,
   skipemptylines: true,
+  wait: nil,
 }
 
 def bstrip_eol(str)
@@ -73,6 +76,7 @@ class Nargs
     #end
     @linesep = opts.linesep
     @pids = []
+    @ci = 0
   end
 
   def verbose(fmt, *args)
@@ -83,19 +87,26 @@ class Nargs
   end
 
   def real_spawn(com, *args)
+    pid = 0
     if @opts.testonly then
       return 0
     else
       #pid = Process.spawn(com, *args)
+
 #=begin
-      pid = 0
       #pid = fork do
         #Process.exec(com, *args)
+        #$stderr.printf("system: %s\n", [com, *args].map(&:dump).join(" "))
         if not system(com, *args) then
-          #$stderr.printf("failed to spawn %p\n", com)
+        #if pid < 0 then
+          $stderr.printf("failed to spawn %p\n", com)
           #exit(1)
         end
       #end
+      trap("INT"){
+        $stderr.printf("***killing process***\n")
+        Proces.kill(pid, 9)
+      }
 #=end
     #$stderr.printf("after spawning\n")
     return pid
@@ -115,6 +126,15 @@ class Nargs
       end
     rescue => ex
     end
+  end
+
+  def wait_userinput
+    # open a direct handle to the current terminal to "pause"
+    # this will NOT work on windows, obviously.
+    File.open("/dev/tty", "r") do |fh|
+      fh.gets
+    end
+    return nil
   end
 
   def build_command(values)
@@ -162,15 +182,8 @@ class Nargs
       verbose("built command: %s", com.map(&:scrub).shelljoin)
       pid = nil
       first = com.shift
-
       # spawn our process
       pid = real_spawn(first, *com)
-=begin
-      trap("INT") do
-        $stderr.printf("caught ^C, killing %d\n", pid)
-        real_kill(pid, 9)
-      end
-=end
       verbose("spawn pid=%d", pid)
       # concurrency must be specified explicitly - otherwise, wait for process to finish
       if not @opts.concurrent then
@@ -180,7 +193,12 @@ class Nargs
         @pids.push(pid)
       end
     end
-    
+    @ci += 1
+    if @ci == @opts.wait then
+      $stderr.printf("nargs: ran %d commands - press enter to continue with the next\n", @ci)
+      wait_userinput
+      @ci = 0
+    end
   end
 
   def main
@@ -188,6 +206,7 @@ class Nargs
     # save current working directory in case '-d' was specified
     thisdir = Dir.pwd
     mustchdir = false
+    ci = 0
     begin
       @io.each_line(@linesep) do |line|
         #val = bstrip(line)
@@ -331,6 +350,11 @@ begin
     }
     prs.on(nil, "--verbose", "enable verbose messages"){|v|
       opts.verbose = true
+    }
+    prs.on("-w<n>", "--wait=<n>", "execute <n> arguments, then wait for enter for the next <n> (implies '-1')"){|v|
+      opts.wait = v.to_i
+      opts.maxargs = 1
+      $stderr.printf("wait: %d\n", opts.wait)
     }
   }
   prs.parse!

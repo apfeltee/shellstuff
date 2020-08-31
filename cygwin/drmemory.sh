@@ -6,4 +6,4 @@ drmemory_bin64="$drmemory_root/bin64"
 
 [[ "$drmemory_just_want_config" ]] && return
 
-exec "$drmemory_bin64/drmemory.exe" "$@"
+exec "$drmemory_bin64/drmemory.exe" -batch -top_stats "$@"

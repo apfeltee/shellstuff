@@ -6,7 +6,7 @@ require "find"
 require "mimemagic"
 require "mimemagic/overlay"
 # gem ruby-magic
-require "magic"
+#require "magic"
 
 #$SAFE = 1
 KNOWN_EXTENSIONS = <<__EOF__
@@ -72,6 +72,7 @@ text/x-php : .php
 
 
 message/rfc822: .eml
+message/news: .eml
 
 
 application/x-dosdriver : .sys
@@ -167,11 +168,9 @@ require "magic"
 
 class RbFile
   def initialize
-    @magic = Magic.mime
   end
 
   def close
-    @magic.close
   end
 
   # in some rare cases, #descriptor returns empty values
@@ -196,6 +195,8 @@ class RbFile
   end
 
   def get(flag, fh)
+    return MimeMagic.by_magic(fh)
+=begin
     oflag = @magic.flags
     begin
       @magic.flags = flag
@@ -203,10 +204,12 @@ class RbFile
     ensure
       @magic.flags = oflag
     end
+=end
   end
 
   def get_mime(fh)
-    return get(Magic::MIME | Magic::CONTINUE, fh)
+    #return get(Magic::MIME | Magic::CONTINUE, fh)
+    return get(0, fh)
   end
 
   def get_description(fh)
@@ -300,7 +303,7 @@ class FixExtensions
     )
     minfo = get_mime(filepath, hasext)
     mime = minfo.type
-    newext = minfo.extensions.first
+    newext = minfo.extensions.first.dup
     if (mime != nil) && ((newext == nil) || @opts.assumenoext) then
       if @extmap.key?(mime) then
         newext = @extmap[mime]

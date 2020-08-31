@@ -4,7 +4,7 @@ require "securerandom"
 require "optparse"
 
 
-BADCHARS = %w(i I l L o O 0 q g 9 z Z s S 1)
+BADCHARS = %w(i I l L q g z Z s S 0 1 2 3 4 5 6 7 8 9)
 DEFAULTLENGTH = 10
 DEFAULTAMOUNT = 1
 DEFAULTBUFSIZE = 50
@@ -43,7 +43,7 @@ def randpass(len, bufsz)
     end
   end
   rtstr = rtbuf.join
-  $stderr.printf("-- did %d updates\n", updcnt)
+  #$stderr.printf("-- did %d updates\n", updcnt)
   # all done
   return rtstr
 end

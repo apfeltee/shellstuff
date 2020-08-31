@@ -5,6 +5,8 @@ require "optparse"
 require "pathname"
 require "fileutils"
 require "find"
+require "shellwords"
+require "open3"
 
 # mapping for archives that 7z can't handle (yet)
 # name_of_function => list_of_file_extensions
@@ -59,20 +61,6 @@ class UnpackAll
     msg($stderr, "WARNING: %s\n", fmt, *a, **kw)
   end
 
-  def make_outdir(basedir, stem)
-    if File.exist?(stem) then
-      ci = 0
-      while true do
-        buf = sprintf("%s_%d", stem, ci)
-        if not File.exist?(buf) then
-          return buf
-        end
-        ci += 1
-      end
-    end
-    return stem
-  end
-
   def find_extractor(ext)
     ext = (
       if (ext != nil) && (ext[0] == ".") then
@@ -93,13 +81,63 @@ class UnpackAll
     return nil
   end
 
+  def find_command(name)
+    ENV["PATH"].split(":").each do |elem|
+      base = File.join(elem, name)
+      more = %w(exe bat cmd).map{|ext|  base + "." + ext }
+      if File.file?(base) then
+        return base
+      else
+        more.each do |mp|
+          return mp if File.file?(mp)
+        end
+      end
+    end
+    return nil
+  end
+
+  def shsystem(cmd, idx, ac)
+    ps = sprintf("[%-5d of %-5d]", idx, ac)
+    if (path=find_command("faketty")) != nil then
+      cmd = ["faketty", *cmd]
+    end
+    $stdout.printf("%s running: %s\n", ps, cmd.shelljoin)
+    Open3.popen2(*cmd, {err: [:child, :out]}) do |inp, outp, waiter|
+      inp.sync = true
+      outp.sync = true
+      outp.each_line do |ln|
+        ln.rstrip!
+        $stdout.printf("%s %s\n", ps, ln)
+        $stdout.flush
+      end
+      return waiter.value.success?
+    end
+    return false
+  end
+
+  def make_outdir(basedir, stem)
+    if File.exist?(stem) then
+      ci = 0
+      while true do
+        buf = sprintf("%s_%d", stem, ci)
+        if not File.exist?(buf) then
+          return buf
+        end
+        ci += 1
+      end
+    end
+    return stem
+  end
+
+
+
   # wrapper for commands that have no flag to set output directory
   # this is usually the case for really old commands (arc, zoo, etc)
   # first command is an array with the extraction command, and
   # a "%" denoting the filename, i.e.: ["foo", "-bar", "%"]
   # which becomes ["foo", "-bar", "somefile.foo"]. the "%" can
   # appear whereever, obviously.
-  def extractor_has_no_output_flag(execmd, basedir, file, odir)
+  def extractor_has_no_output_flag(execmd, basedir, file, odir, idx, ac)
     FileUtils.mkdir_p(odir)
     rfile = File.absolute_path(file)
     absodir = File.absolute_path(File.join(basedir, odir))
@@ -118,7 +156,7 @@ class UnpackAll
             v
           end
         }
-        return system(*realcmd)
+        return shsystem(realcmd, idx, ac)
       end
     ensure
       if File.empty?(odir) then
@@ -130,37 +168,37 @@ class UnpackAll
     end
   end
 
-  def do_arc(basedir, file, odir)
-    return extractor_has_no_output_flag(["arc", "x", "%"], basedir, file, odir)
+  def do_arc(basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag(["arc", "x", "%"], basedir, file, odir, idx, ac)
   end
 
-  def do_lbr(basedir, file, odir)
-    return extractor_has_no_output_flag(["unlbr", "-Loa", "%"], basedir, file, odir)
+  def do_lbr(basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag(["unlbr", "-Loa", "%"], basedir, file, odir, idx, ac)
   end
 
-  def do_lzh(basedir, file, odir)
+  def do_lzh(basedir, file, odir, idx, ac)
     cmd = [
       "lha", "xfw=#{odir}", file
     ]
-    return system(*cmd)
+    return shsystem(cmd, idx, ac)
   end
 
-  def do_zoo(basedir, file, odir)
-    return extractor_has_no_output_flag(["zoo", "x", "%"], basedir, file, odir)
+  def do_zoo(basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag(["zoo", "x", "%"], basedir, file, odir, idx, ac)
   end
   
-  def do_sit(basedir, file, odir)
-    return extractor_has_no_output_flag(["unsit", "%"], basedir, file, odir)
+  def do_sit(basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag(["unsit", "%"], basedir, file, odir, idx, ac)
   end
 
 
-  def run_extractor(ext, basedir, file, odir)
+  def run_extractor(ext, basedir, file, odir, idx, ac)
     $stderr.printf("run_extractor(ext=%p, basedir=%p, file=%p, odir=%p) ...\n", ext, basedir, file, odir)
     if (recv=find_extractor(ext)) != nil then
       # sub-processors may return false - in that case, it will be taken
       # over by 7z again
       $stderr.printf("** running extractor %p\n", recv)
-      if self.send(recv, basedir, file, odir) then
+      if self.send(recv, basedir, file, odir, idx, ac) then
         return true
       end
     end
@@ -172,7 +210,7 @@ class UnpackAll
     end
     cmd.push("-o#{odir}")
     cmd.push(file)
-    return system(*cmd)
+    return shsystem(cmd, idx, ac)
   end
 
   def procitem(name, recv, *args, &b)
@@ -207,7 +245,7 @@ class UnpackAll
     }
   end
 
-  def unzip(file)
+  def unzip(file, idx, ac)
     base = File.basename(file)
     ext = File.extname(base)
     stem = File.basename(base, ext)
@@ -215,7 +253,7 @@ class UnpackAll
     Dir.chdir(dir) do
       #if system("win7z", "x", "-y", "-pfuckoff", base, "-o#{stem}") then
       odir = make_outdir(dir, stem)
-      if run_extractor(ext.downcase[1 .. -1], dir, base, odir) then
+      if run_extractor(ext.downcase[1 .. -1], dir, base, odir, idx, ac) then
         delfile(base)
         if File.directory?(odir) then
           items = Dir.children(odir).map{|s| File.join(odir, s) }
@@ -254,14 +292,20 @@ class UnpackAll
 
   def walk(dir)
     note("scanning %p ...", dir)
+    afiles = []
     Find.find(dir) do |path|
       next unless File.file?(path)
       if path.scrub.match?(PKGRE) then
-        if @opts.findonly then
-          $stdout.puts(path)
-        else
-          unzip(path)
-        end
+        afiles.push(path)
+      end
+    end
+    acount = afiles.length
+    note("found %d files", acount)
+    afiles.each.with_index do |file, i|
+      if @opts.findonly then
+        $stdout.puts(file)
+      else
+        unzip(file, i, acount)
       end
     end
   end
@@ -319,6 +363,10 @@ begin
   OptionParser.new{|prs|
     prs.on("-h", "--help", "show this help and exit"){
       puts(prs.help)
+      exit(0)
+    }
+    prs.on("-r", "--regex", "print regex used to find files, and exit"){
+      puts(PKGRE)
       exit(0)
     }
     prs.on("-z<path>", "-x<path>", "--7z=<path>", "specify path to 7z"){|v|

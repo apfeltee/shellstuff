@@ -111,17 +111,22 @@ class MVMergeProgram
     rc = 0
     @statself = File.stat(dest)
     sources.each do |src|
-      if File.directory?(src) then
-        if mergedirs(src, dest) then
-          futils_rmrf(src)
+      if File.directory?(src) || File.file?(src) then
+        if File.file?(src) then
+          futils_mv(src, dest)
         else
-          error("copy+merge of %p to %p failed?", src, dest)
-          rc = 1
+          if mergedirs(src, dest) then
+            futils_rmrf(src)
+          else
+            error("copy+merge of %p to %p failed?", src, dest)
+            rc = 1
+          end
         end
-      elsif File.file?(src) then
-        futils_mv(src, dest)
       else
         error("%p is neither a regular file, nor a directory", src)
+        if src.include?('*') then
+          error("maybe the directories are empty?")
+        end
         rc = 1
       end
     end

@@ -52,9 +52,9 @@ def printnatohandle(hnd, opts)
     if ALPH.include?(upc) then
       outstr = (
         if wantnato then
-          ALPH[upc].first
+          ALPH[upc][0]
         else
-          ALPH[upc].second
+          ALPH[upc][1]
         end
       )
       if wantdowncase then

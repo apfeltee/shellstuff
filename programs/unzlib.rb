@@ -6,6 +6,66 @@ require "fileutils"
 require "zlib"
 require "tempfile"
 
+=begin
+var str = ("The dictionary should consist of strings (byte sequences) that" +
+    " are likely to be encountered later in the data to be compressed," +
+    " with the most commonly used strings preferably put towards the " +
+    "end of the dictionary. Using a dictionary is most useful when the" +
+    " data to be compressed is short and can be predicted with good" +
+    " accuracy; the data can then be compressed better than with the " +
+    "default empty dictionary.")
+// Extract words, remove punctuation (extra: replace(/\s/g, " "))
+var words = str.replace(/[,\;.:\(\)]/g, "").split(" ").sort();
+var  wcnt = []; // pairs
+var  w = ""; // current word
+var cnt = 0; // current word count
+for (var i = 0, cnt = 0, w = ""; i < words.length; i++) {
+    if (words[i] === w) {
+        cnt++; // another match
+    } else {
+        if (w !== "")
+            wcnt.push([cnt, w]); // Push a pair (count, word)
+        cnt = 1; // Start counting for this word
+        w = words[i]; // Start counting again
+    }
+}
+if (w !== "")
+    wcnt.push([cnt, w]); // Push last word
+wcnt.sort(); // Greater matches at the end
+for (var i in wcnt)
+    wcnt[i] = wcnt[i][1]; // Just take the words
+var dict = wcnt.join("").slice(-70); // Join the words, take last 70 chars
+=end
+
+def mkdict(str)
+  words = str.gsub(/[,\;.:\(\)]/, "").split(" ").sort
+  wcnt = []
+  i = 0
+  cnt = 0
+  w = ""
+  (0 .. words.length).each do |i|
+      if (words[i] == w) then
+          cnt += 1 # another match
+      else
+          if (w !== "")
+              wcnt.push([cnt, w]); # Push a pair (count, word)
+          end
+          cnt = 1; # Start counting for this word
+          w = words[i]; # Start counting again
+      end
+  end
+  if (w != "") then
+      wcnt.push([cnt, w]); # Push last word
+  end
+  wcnt.sort! # Greater matches at the end
+  #for (var i in wcnt)
+  #    wcnt[i] = wcnt[i][1]; # Just take the words
+  (i .. wcnt.length).each do |i|
+    wcnt[i] = wcnt[i][1]
+  end
+  return dict = wcnt.join[-70 .. -1]; # Join the words, take last 70 chars
+end
+
 def iofmtfwd(out, postfmt, fmt, *args, **kw)
   str = (
     if args.empty? && kw.empty? then
@@ -58,7 +118,7 @@ class UnZlib
     end
   end
 
-  def unzlib_io(inio, outio, chunksz: (1024 * 8), &block)
+  def unzlib_io(inio, outio, filepath, chunksz: (1024 * 8), &block)
     zi  = Zlib::Inflate.new
     bycompr = 0
     bydecompr = 0
@@ -90,20 +150,21 @@ class UnZlib
     }
     begin
       while true do
-        #begin
+        begin
           lam.call
-=begin
-        #rescue Zlib::NeedDict
+#=begin
+        rescue Zlib::NeedDict
           #zi.set_dictionary((("0" .. "z").to_a).join)
+          zi.set_dictionary(mkdict())
         rescue Zlib::DataError => ex
           if @opts.force then
             lam.call
           else
             raise ex
           end
-=end
+#=end
         end
-      #end
+      end
     ensure
       zi.close
     end
