@@ -6,6 +6,11 @@ def msg(vb, fmt, *args)
   end
 end
 
+def vexec(vb, cmd)
+  msg(vb, "command: %s", cmd.map(&:dump).join(" "))
+  exec(*cmd)
+end
+
 def cget(opts, urls, vb)
   cmd = ["curl", "-OL", "--progress-bar", *opts]
   msg(vb, "options: %p", opts)
@@ -21,8 +26,7 @@ def cget(opts, urls, vb)
     end
     return (if (excode > 0) then false else true end)
   else
-    msg(vb, "exec()ing call to curl")
-    exec(*cmd)
+    vexec(vb, [*cmd, urls.first])
   end
   return true
 end
@@ -30,7 +34,8 @@ end
 begin
   if ARGV.empty? then
     puts("cget is a convenience wrapper for 'curl -OL' ('-O' = 'remote filename', '-L' = 'follow redirects')")
-    puts("usage: cget <url> [<another url> ...]")
+    puts("usage: cget [<options>] <url> [<another url> ...]")
+    puts("try 'curl --help' for options")
   else
     urls = []
     opts = []

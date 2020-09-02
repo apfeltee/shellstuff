@@ -1,5 +1,7 @@
 #!/usr/bin/ruby
 
+# i don't remember what this does, or why i wrote it...
+
 require "ostruct"
 require "optparse"
 

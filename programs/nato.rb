@@ -75,7 +75,7 @@ def printnatofile(file, opts)
       printnatohandle(fh, opts)
     end
   rescue => ex
-    $stderr.printf("nato: failed to open %p: (%s) %s\n", )
+    $stderr.printf("nato: failed to open %p: (%s) %s\n", file, ex.class, ex.message)
     return false
   end
   return true
