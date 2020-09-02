@@ -2,14 +2,30 @@
 
 require "fileutils"
 
-$scriptpath = File.absolute_path(__dir__)
-
 def chdir(dir, &b)
-  Dir.chdir(File.join($scriptpath, dir), &b)
+  path = File.join(__dir__, dir)
+  if File.directory?(path) then
+    begin
+      Dir.chdir(path, &b)
+    rescue => ex
+      # apparently this will/might happen if Dir.chdir() (or rather, chdir() in general) is
+      # being called from a directory that was deleted. this sounds silly, so:
+      #
+      # mkdir blah
+      # cd blah
+      # (go to another tab, and rmdir blah)
+      # (go back to where you cd'd into blah)
+      # ruby -e 'Dir.chdir(".")'
+      # -e:1:in `chdir': No such file or directory @ dir_s_chdir - .
+      #
+      # i wonder if that's true for Linux, also.
+      $stderr.printf("bug in chdir: (%s) %s\n", ex.class.name, ex.message)
+    end
+  end
 end
 
 def glob(pat, &b)
-  Dir.glob(File.join($scriptpath, pat), &b)
+  Dir.glob(File.join(__dir__, pat), &b)
 end
 
 def symlink_real(from, to)
@@ -48,7 +64,7 @@ end
 
 def do_dir(name)
   puts("Symlinking #{name} scripts/programs ...")
-  glob("#{name}/*").each do |file|
+  glob(File.join(name, "*")).each do |file|
     symlink_home(file)
   end
 end
@@ -56,7 +72,7 @@ end
 
 ## first "install" native programs...
 chdir("native") do
-  if system("make") then
+  if File.file?("Makefile") && system("make") then
     system("make install")
   end
 end

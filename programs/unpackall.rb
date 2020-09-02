@@ -97,7 +97,7 @@ class UnpackAll
   end
 
   def shsystem(cmd, idx, ac)
-    ps = sprintf("[%-5d of %-5d]", idx, ac)
+    ps = sprintf("[%-5d of %-5d]", idx+1, ac)
     if (path=find_command("faketty")) != nil then
       cmd = ["faketty", *cmd]
     end
@@ -106,6 +106,7 @@ class UnpackAll
       inp.sync = true
       outp.sync = true
       outp.each_line do |ln|
+        ln.scrub!
         ln.rstrip!
         $stdout.printf("%s %s\n", ps, ln)
         $stdout.flush

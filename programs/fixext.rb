@@ -244,6 +244,7 @@ class FixExtensions
   def get_mime_via_rubymagic(filepath)
     File.open(filepath, "rb") do |fh|
       mime = @rbfile.get_mime(fh)
+      $stderr.printf("get_mime=%p\n", mime)
       if (mime == nil) || (mime == []) then
         return Wrapper.new(nil, [])
       end
