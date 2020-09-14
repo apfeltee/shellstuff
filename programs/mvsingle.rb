@@ -77,7 +77,7 @@ def moveto(srcdir, basename, item, dest)
   destp = File.join(dest, basename)
   if File.exist?(destp) then
     if File.directory?(destp) then
-      return system("mvmerge", "-f", item, dest)
+      return system("mvmerge", "-fv", item, dest)
     else
       newname = make_newname(srcdir, destp)
       $stderr.printf("warning: a file named %p already exists! file will be renamed to %p\n", basename, newname)

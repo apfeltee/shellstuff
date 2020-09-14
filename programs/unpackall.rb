@@ -111,6 +111,7 @@ class UnpackAll
         $stdout.printf("%s %s\n", ps, ln)
         $stdout.flush
       end
+      $stdout.printf("past each_line?\n")
       return waiter.value.success?
     end
     return false

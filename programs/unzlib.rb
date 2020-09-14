@@ -47,7 +47,7 @@ def mkdict(str)
       if (words[i] == w) then
           cnt += 1 # another match
       else
-          if (w !== "")
+          if (w != "") then
               wcnt.push([cnt, w]); # Push a pair (count, word)
           end
           cnt = 1; # Start counting for this word
@@ -143,10 +143,11 @@ class UnZlib
         if buflen == 0 then
           verbose("buffer is null!")
         end
+
+      end
         bycompr += buflen
         inflated = zi.inflate(buf)
         bydecompr += outio.write(inflated)
-      end
     }
     begin
       while true do
@@ -173,7 +174,7 @@ class UnZlib
   def unzlib_file(filepath, outpath)
     File.open(filepath, "rb") do |inio|
       File.open(outpath, "wb") do |outio|
-        unzlib_io(inio, outio)
+        unzlib_io(inio, outio, filepath)
       end
     end
   end
@@ -196,9 +197,9 @@ class UnZlib
       begin
         unzlib_file(infile, destfile)
         FileUtils.rm(infile) if @opts.deleteafter
-      rescue => ex
-        FileUtils.rm_f(destfile)
-        fail("exception while inflating %p: (%s) %s", infile, ex.class, ex.message)
+      #rescue => ex
+        #FileUtils.rm_f(destfile)
+        #fail("exception while inflating %p: (%s) %s", infile, ex.class, ex.message)
       end
     else
       fail("file %p has unknown extension %p", infile, ext)
