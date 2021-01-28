@@ -24,9 +24,7 @@ module Servlet
 
   class AdminPage < BasicServlet
     def do_GET(request, response)
-      if request.query["a"] && request.query["b"] then
-        a = request.query["a"]
-        b = request.query["b"]
+      if (a = request.query["a"]) && (b = request.query["b"]) then
         response.status = 200
         response.content_type = "text/plain"
         result = nil

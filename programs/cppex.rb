@@ -40,6 +40,7 @@ def cppex(opts, files)
     end
   end
   cmd.push("-")
+  $stderr.printf("cmd: %s\n", cmd.map{|s| s.dump[1 .. -2] }.join(" "))
   IO.popen(cmd, "r+") do |pipe|
     opts.systemincludes.each do |inc|
       pipe.printf("#include <%s>\n", inc)

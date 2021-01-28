@@ -38,10 +38,18 @@ class PathGlob
     end
   end
 
+  def try_chdir(d, &b)
+    begin
+      Dir.chdir(d, &b)
+    rescue => ex
+      $stderr.printf("pathglob: error: chdir(%p): (%s) %s\n", d, ex.class.name, ex.message)
+    end
+  end
+
   def glob(str)
     @paths.each do |path|
       if File.directory?(path) then
-        Dir.chdir(path) do
+        try_chdir(path) do
           Dir.glob(str, File::FNM_CASEFOLD) do |res|
             #p res
             next if canskip(res)

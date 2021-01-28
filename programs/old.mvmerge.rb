@@ -19,7 +19,6 @@
 require "ostruct"
 require "optparse"
 require "fileutils"
-require "find"
 
 module FileAction
   
@@ -46,31 +45,11 @@ class MVMergeProgram
     end
   end
 
-  # old version just rm -rf'd. this one is slower, but
-  # accurately checks whether or not the directories
-  # a) are actually directories
-  # b) are actually empty
-  def futils_rmdir(dir)
-    if Dir.empty?(dir) then
-      wrapfutils("rmdir", dir)
-    else
-      Dir.entries(dir).each do |itm|
-        next if ((itm == ".") || (itm == ".."))
-        itm = File.join(dir, itm)
-        $stderr.printf("rmdir.deep:itm=%p\n", itm)
-        next unless File.directory?(itm)
-        if Dir.empty?(itm) then
-          wrapfutils("rmdir", itm)
-        else
-          futils_rmdir(itm)
-        end
-      end
-      if Dir.empty?(dir) then
-        wrapfutils("rmdir", dir)
-      else
-        futils_rmdir(dir)
-      end
-    end
+  def futils_rmdir(path)
+    wrapfutils("rmdir", path)
+    #Find.find(path) do |itm|
+      #next unless File.directory?(itm)
+    #end
   end
 
   def error(fmt, *args)

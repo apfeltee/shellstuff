@@ -11,6 +11,8 @@ require "open3"
 # mapping for archives that 7z can't handle (yet)
 # name_of_function => list_of_file_extensions
 EXES = {
+  #do_zip: ["zip"],
+  #do_rar: ["rar"],
   do_lzh: ["lzh", "lha"],
   do_zoo: ["zoo"],
   # really old archives use .ark, but are actually .arc
@@ -18,6 +20,7 @@ EXES = {
   # ANCIENT SHIT
   do_lbr: ["lbr"],
   do_sit: ["sit"],
+  do_lzx: ["lzx"],
 }
 
 PKGRE = /\.(zip|rar|7z|tar|arj|dsk|cpio|pax|#{EXES.values.flatten.join("|")})$/i
@@ -32,6 +35,7 @@ class UnpackAll
     @opts = opts
     @failed = []
     @failfh = nil
+    @flines = 0
     if @opts.failfile != nil then
       @failfh = File.open(@opts.failfile, "wb")
     end
@@ -97,24 +101,8 @@ class UnpackAll
   end
 
   def shsystem(cmd, idx, ac)
-    ps = sprintf("[%-5d of %-5d]", idx+1, ac)
-    if (path=find_command("faketty")) != nil then
-      cmd = ["faketty", *cmd]
-    end
-    $stdout.printf("%s running: %s\n", ps, cmd.shelljoin)
-    Open3.popen2(*cmd, {err: [:child, :out]}) do |inp, outp, waiter|
-      inp.sync = true
-      outp.sync = true
-      outp.each_line do |ln|
-        ln.scrub!
-        ln.rstrip!
-        $stdout.printf("%s %s\n", ps, ln)
-        $stdout.flush
-      end
-      $stdout.printf("past each_line?\n")
-      return waiter.value.success?
-    end
-    return false
+    $stdout.printf("[%-5d of %-5d]\n", idx+1, ac)
+    return system(*cmd)
   end
 
   def make_outdir(basedir, stem)
@@ -170,6 +158,16 @@ class UnpackAll
     end
   end
 
+
+  ##
+  ## this is where individual extractor callbacks are defined.
+  ## most tools lack the means of specifing an output directory, so
+  ## that functionality is emulated through extractor_has_no_output_flag().
+  ##
+  def do_zip(basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag(["unzip", "-x", "%"], basedir, file, odir, idx, ac)
+  end
+
   def do_arc(basedir, file, odir, idx, ac)
     return extractor_has_no_output_flag(["arc", "x", "%"], basedir, file, odir, idx, ac)
   end
@@ -193,6 +191,9 @@ class UnpackAll
     return extractor_has_no_output_flag(["unsit", "%"], basedir, file, odir, idx, ac)
   end
 
+  def do_lzx(basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag(["unlzx", "-x", "%"], basedir, file, odir, idx, ac)
+  end
 
   def run_extractor(ext, basedir, file, odir, idx, ac)
     $stderr.printf("run_extractor(ext=%p, basedir=%p, file=%p, odir=%p) ...\n", ext, basedir, file, odir)
@@ -297,7 +298,9 @@ class UnpackAll
     afiles = []
     Find.find(dir) do |path|
       next unless File.file?(path)
-      if path.scrub.match?(PKGRE) then
+      extn = File.extname(path).downcase
+      if path.scrub.match?(PKGRE) || @opts.extraexts.include?(extn) then
+        note("found %p", path)
         afiles.push(path)
       end
     end
@@ -324,6 +327,9 @@ class UnpackAll
       if @failfh != nil then
         @failfh.close
       end
+    end
+    if @failed.empty? && (@opts.failfile != nil) && File.file?(@opts.failfile) then
+      File.delete(@opts.failfile)
     end
   end
 
@@ -361,6 +367,7 @@ begin
     delafter: false,
     findonly: false,
     failfile: nil,
+    extraexts: [],
   })
   OptionParser.new{|prs|
     prs.on("-h", "--help", "show this help and exit"){
@@ -399,6 +406,11 @@ begin
         $stderr.printf("unpackall: --fail: refusing to overwrite an existing path\n")
         exit(1)
       end
+    }
+    prs.on("-e<s>", "--ext=<s>", "add to list of extensions to search"){|v|
+      v.strip!
+      v = (if (v[0] != '.') then ('.' + v) else v end)
+      opts.extraexts.push(v)
     }
   }.parse!
   ua = UnpackAll.new(opts)

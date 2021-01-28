@@ -4,6 +4,20 @@ require "ostruct"
 require "optparse"
 require "find"
 
+def size_to_readable(size)
+  # byte, kilobyte, megabyte, gigabyte, terabyte, petabyte, exabyte, zettabyte
+  # the last two seem... unlikely, tbh
+  units = ['B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']
+  if (size == 0) then
+    return '0B'
+  end
+  exp = (Math.log(size) / Math.log(1024)).to_i
+  if (exp > 6) then
+    exp = 6
+  end
+  return sprintf('%.1f%s', (size.to_f / (1024 ** exp)), units[exp])
+end
+
 class FileFind
   def initialize(opts)
     @opts = opts
@@ -12,6 +26,8 @@ class FileFind
     @patterns = @opts.patterns
     @asregex = (@opts.asregex == true)
     @ignorecase = (@opts.ignorecase == true)
+    @delfiles = (@opts.deletefiles == true)
+    @printsize = (@opts.printsize == true)
     if @asregex then
       @patterns.map!{|pat| Regexp.new(pat, (@ignorecase ? "i" : nil)) }
     end
@@ -26,7 +42,7 @@ class FileFind
 
   def ismatch_spglob(path, pat)
     base = File.basename(path)
-    return File.fnmatch(pat, base, (@ignorecase ? File::FNM_CASEFOLD : 0))
+    return File.fnmatch(pat.scrub, base.scrub, (if @ignorecase then File::FNM_CASEFOLD else 0 end))
   end
 
   def ismatch_singlepattern(path, pat)
@@ -57,18 +73,50 @@ class FileFind
     return true
   end
 
+  def outsize(path)
+    sz = (
+      begin
+        File.size(path)
+      rescue
+        0
+      end
+    )
+    $stdout.printf("%s\t", size_to_readable(sz))
+  end
+
   def outwrite(path)
+    if @printsize then
+      outsize(path)
+    end
     $stdout.puts(path)
     $stdout.flush
   end
 
+  def delfile(path)
+    $stdout.printf("deleting %p ... ", path)
+    begin
+      File.delete(path)
+    rescue => ex
+      $stdout.printf("failed: (%s) %s", ex.class.name, ex.message)
+    else
+      $stdout.printf("ok")
+    ensure
+      $stdout.puts
+    end
+  end
+
   def main(dirs)
+    $stdout.sync = true
     if dirs.empty? then
       dirs.push(".")
     end
     Find.find(*dirs) do |path|
       if ismatch(path) then
-        outwrite(path)
+        if @delfiles then
+          delfile(path)
+        else
+          outwrite(path)
+        end
       end
     end
   end
@@ -82,6 +130,7 @@ begin
     onlyfiles: false,
     onlydirs: false,
     ignorecase: false,
+    printsize: false,
   })
   OptionParser.new{|prs|
     prs.on("-p<pat>", "set pattern"){|s|
@@ -98,6 +147,12 @@ begin
     }
     prs.on("-d", "only directories"){
       opts.onlydirs = true
+    }
+    prs.on("-s", "--size", "print file sizes"){
+      opts.printsize = true
+    }
+    prs.on("--delete", "delete files"){
+      opts.deletefiles = true
     }
   }.parse!
   ff = FileFind.new(opts)

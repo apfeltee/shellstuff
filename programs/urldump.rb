@@ -235,7 +235,9 @@ begin
   if ARGV.empty? then
     if not $stdin.tty? then
       $stdin.each_line do |line|
-        urldump(line.strip, options)
+        line.strip!
+        next if line.empty?
+        urldump(line, options)
       end
     else
       $stderr.puts(prs)
