@@ -35,7 +35,10 @@ def iter(opts,input, output)
       end
     end
     esc = escape(chunk)
-    output.write(esc)
+    begin
+      output.write(esc)
+    rescue Errno::EPIPE
+    end
   end
 end
 
@@ -63,6 +66,19 @@ begin
     opts.stripleftws = false
     opts.striprightws = false
   end
-  iter(opts, inp, outp)
+  first = ARGV.first
+  if first then
+    ARGV.each do |arg|
+      if File.file?(arg) then
+        File.open(arg, "rb") do |fh|
+          iter(opts, fh, outp)
+        end
+      else
+        iter(opts, StringIO.new(arg), outp)
+      end
+    end
+  else
+    iter(opts, inp, outp)
+  end
 end
 

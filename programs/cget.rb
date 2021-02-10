@@ -209,7 +209,16 @@ class CGet
       msg("ERROR: failed to parse content-disposition header: %p", hd)
       exit(1)
     else
-      @outputfile = check_ofile(m["filename"].strip)
+      fn = m["filename"].strip
+      while (fn.match?(rxbegin=/^["'\/\\]/) || fn.match?(rxend=/["'\/\\]$/)) do
+        if fn.match?(rxbegin) then
+          fn = fn[1 .. -1]
+        end
+        if fn.match?(rxend) then
+          fn = fn[0 .. -2]
+        end
+      end
+      @outputfile = check_ofile(fn)
       msg("parsed content-disposition; output file is %p", @outputfile)
     end
   end
@@ -225,13 +234,13 @@ class CGet
 
   def handle_header(data)
     hd = data.scrub.rstrip
+    $stderr.printf("Header: %s\n", hd.dump[1 .. -2])
     if (m = hd.match(/HTTP\/([\d\.]+)\s*(?<status>\d+)/)) != nil then
       status = m["status"].strip.to_i
       if status == 200 then
         @can_write = true
       end
     elsif (hd != nil) && (hd != "") then
-      $stderr.printf("Header: %s\n", hd.dump[1 .. -2])
       if hd.match?(/^content-disposition:/i) then
         if (@outputhandle == nil) then
           parse_content_disposition(hd)

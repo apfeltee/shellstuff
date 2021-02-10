@@ -35,9 +35,13 @@ class UnpackAll
     @opts = opts
     @failed = []
     @failfh = nil
+    @processedfh = nil
     @flines = 0
     if @opts.failfile != nil then
       @failfh = File.open(@opts.failfile, "wb")
+    end
+    if @opts.processedfile != nil then
+      @processedfh = File.open(@opts.processedfile, "ab")
     end
   end
 
@@ -169,7 +173,7 @@ class UnpackAll
   end
 
   def do_arc(basedir, file, odir, idx, ac)
-    return extractor_has_no_output_flag(["arc", "x", "%"], basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag(["arc", "xo", "%"], basedir, file, odir, idx, ac)
   end
 
   def do_lbr(basedir, file, odir, idx, ac)
@@ -253,6 +257,9 @@ class UnpackAll
     ext = File.extname(base)
     stem = File.basename(base, ext)
     dir = File.dirname(file)
+    if @processedfh != nil then
+      @processedfh.puts(file)
+    end
     Dir.chdir(dir) do
       #if system("win7z", "x", "-y", "-pfuckoff", base, "-o#{stem}") then
       odir = make_outdir(dir, stem)
@@ -367,6 +374,7 @@ begin
     delafter: false,
     findonly: false,
     failfile: nil,
+    processedfile: nil,
     extraexts: [],
   })
   OptionParser.new{|prs|
@@ -396,6 +404,9 @@ begin
     }
     prs.on("-s", "--find", "find archive files only, does not unpack anything"){
       opts.findonly = true
+    }
+    prs.on("-d<f>", "--finished=<f>", "write names of processed files to <f>"){|v|
+      opts.processedfile = v
     }
     prs.on("-f<path>", "--fail=<path>", "write paths of archives that failed to extract to <path>"){|v|
       opts.failfile = v

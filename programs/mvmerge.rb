@@ -51,6 +51,13 @@ class MVMergeProgram
   # a) are actually directories
   # b) are actually empty
   def futils_rmdir(dir)
+    symcnt = 0
+    $stderr.printf("futils_rmdir:%p\n", dir)
+    #if we reached this point (see below, leftover check), then
+    # there's nothing else to do. not without running into an infinite loop.
+    if File.symlink?(dir) then
+      return
+    end
     if Dir.empty?(dir) then
       wrapfutils("rmdir", dir)
     else
@@ -58,17 +65,23 @@ class MVMergeProgram
         next if ((itm == ".") || (itm == ".."))
         itm = File.join(dir, itm)
         $stderr.printf("rmdir.deep:itm=%p\n", itm)
-        next unless File.directory?(itm)
-        if Dir.empty?(itm) then
-          wrapfutils("rmdir", itm)
-        else
-          futils_rmdir(itm)
+        if File.symlink?(itm) then
+          symcnt += 1
+        elsif File.directory?(itm) then
+          if Dir.empty?(itm) then
+            wrapfutils("rmdir", itm)
+          else
+            futils_rmdir(itm)
+          end
         end
       end
-      if Dir.empty?(dir) then
-        wrapfutils("rmdir", dir)
-      else
-        futils_rmdir(dir)
+      if symcnt == 0 then
+        # check for leftovers
+        if Dir.empty?(dir) then
+          wrapfutils("rmdir", dir)
+        else
+          futils_rmdir(dir)
+        end
       end
     end
   end
@@ -91,7 +104,7 @@ class MVMergeProgram
     srcdest = File.join(realdest, srcbase)
     if not File.exist?(srcdest) then
       futils_mv(src, srcdest)
-    elsif File.file?(srcdest) then
+    elsif File.file?(srcdest) || File.symlink?(src) then
       # fixme: this is a bogey - but also recursive logic:
       #        will fail (sometimes?) when mergedirs is called recursively.
       if File.stat(srcdest) == @statself then
@@ -106,7 +119,7 @@ class MVMergeProgram
           end
         end
       end
-    elsif File.directory?(srcdest) then
+    elsif File.directory?(srcdest) && (not File.symlink?(srcdest)) then
       # this where we want to merge!!
       if File.directory?(realsrc) then
         Dir.entries(realsrc).each do |item|

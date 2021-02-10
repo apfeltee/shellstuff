@@ -45,6 +45,7 @@ def mvfile(srcdir, ffrom, fto)
 end
 
 def is_single(dir)
+  return nil if File.symlink?(dir)
   files = Dir.entries(dir).reject{|s| s.match(/^\.\.?$/) }
   if files.size == 1 then
     return File.join(dir, files.first)
@@ -85,7 +86,7 @@ def moveto(srcdir, basename, item, dest)
     end
   end
   # don't add an else-branch here: it's supposed to fall through
-  if File.directory?(dest) then
+  if File.directory?(dest) && (not File.symlink?(dest)) then
     return mvfile(srcdir, item, File.join(dest, basename))
   end
   return mvfile(srcdir, item, dest)
@@ -99,6 +100,7 @@ def handle(dir)
     Dir.chdir(dir) do
       Dir.glob("*") do |path|
         next unless File.directory?(path)
+        next if File.symlink?(path)
         if (sfile=is_single(path)) != nil then
           sfbase = File.basename(sfile)
           if (sfbase.downcase == File.basename(path).downcase) then
@@ -128,6 +130,7 @@ class Deep
   def deep(dir)
     Find.find(dir) do |path|
       next unless File.directory?(path)
+      next if File.symlink?(path)
       #$stderr.printf("\n++++ entering %p ++++\n", path)
       @counter += handle(path)
     end
