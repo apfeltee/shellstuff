@@ -19,6 +19,7 @@
 require "ostruct"
 require "optparse"
 require "fileutils"
+require "find"
 
 module FileAction
   
@@ -28,6 +29,7 @@ class MVMergeProgram
   def initialize(opts)
     @opts = opts
     @statself = nil
+    @done = []
   end
 
   # just wraps FileUtils, so the -v flag takes action
@@ -39,17 +41,73 @@ class MVMergeProgram
 
   def futils_mv(src, dest)
     begin
+=begin
+      if File.exist?(dest) then
+        ci = 1
+        while File.exist?(dest) do
+          ext = File.extname(dest).gsub(/^\./, "")
+          nxt = (if ext.empty? then sprintf("%d", ci) else sprintf("%d.%s", ext, ci) end)
+          dest = sprintf("%s.%s", dest, nxt)
+          ci += 1
+        end
+      end
+=end
       wrapfutils("mv", src, dest)
     rescue => ex
-      $stderr.printf("ERROR: (%s) %s\n", ex.class.name, ex.message)
+      $stderr.printf("ERROR: futils_mv: (%s) %s\n", ex.class.name, ex.message)
     end
   end
 
-  def futils_rmdir(path)
-    wrapfutils("rmdir", path)
-    #Find.find(path) do |itm|
-      #next unless File.directory?(itm)
-    #end
+  # old version just rm -rf'd. this one is slower, but
+  # accurately checks whether or not the directories
+  # a) are actually directories
+  # b) are actually empty
+  def futils_rmdir(dir, depthcount=0)
+    symcnt = 0
+    $stderr.printf("futils_rmdir:%p\n", dir)
+    
+    if depthcount > 50 then
+      $stderr.printf("nesting too deeply. this path seems broken!\n")
+      return
+    end
+    #if we reached this point (see below, leftover check), then
+    # there's nothing else to do. not without running into an infinite loop.
+    if File.symlink?(dir) then
+      return
+    end
+    if Dir.empty?(dir) then
+      wrapfutils("rmdir", dir)
+    else
+      Dir.entries(dir).each do |itm|
+        next if ((itm == ".") || (itm == ".."))
+        itm = File.join(dir, itm)
+        if File.symlink?(itm) then
+          symcnt += 1
+        elsif File.directory?(itm) then
+          $stderr.printf("rmdir.deep:itm=%p\n", itm)
+          if Dir.empty?(itm) then
+            wrapfutils("rmdir", itm)
+          else
+            if not @done.include?(itm.downcase) then
+              #@done.push(itm.downcase)
+              futils_rmdir(itm, depthcount + 1)
+            end
+          end
+        end
+      end
+      if symcnt == 0 then
+        # check for leftovers
+        if Dir.empty?(dir) then
+          wrapfutils("rmdir", dir)
+        else
+          if not @done.include?(dir.downcase) then
+            #@done.push(dir.downcase)
+            futils_rmdir(dir, depthcount + 1)
+            
+          end
+        end
+      end
+    end
   end
 
   def error(fmt, *args)
@@ -70,13 +128,14 @@ class MVMergeProgram
     srcdest = File.join(realdest, srcbase)
     if not File.exist?(srcdest) then
       futils_mv(src, srcdest)
-    elsif File.file?(srcdest) then
+    elsif File.file?(srcdest) || File.symlink?(src) then
       # fixme: this is a bogey - but also recursive logic:
       #        will fail (sometimes?) when mergedirs is called recursively.
       if File.stat(srcdest) == @statself then
         error("cannot merge %p with itself\n", srcdest)
       else
         if (@opts.force == true) then
+          
           futils_mv(src, dest)
         else
           if @opts.skipexisting == false then
@@ -85,7 +144,7 @@ class MVMergeProgram
           end
         end
       end
-    elsif File.directory?(srcdest) then
+    elsif File.directory?(srcdest) && (not File.symlink?(srcdest)) then
       # this where we want to merge!!
       if File.directory?(realsrc) then
         Dir.entries(realsrc).each do |item|

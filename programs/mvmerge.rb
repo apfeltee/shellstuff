@@ -21,69 +21,30 @@ require "optparse"
 require "fileutils"
 require "find"
 
-module FileAction
-  
-end
-
 class MVMergeProgram
   def initialize(opts)
     @opts = opts
     @statself = nil
+    @done = []
   end
 
   # just wraps FileUtils, so the -v flag takes action
   def wrapfutils(sym, *args)
-    #$stderr.printf("%s(%p)\n", sym, args)
-    return FileUtils.send(sym, *args, verbose: @opts.verbose)
-    #return FileUtils.send(sym, *args)
+    begin
+      #$stderr.printf("%s(%p)\n", sym, args)
+      return FileUtils.send(sym, *args, verbose: @opts.verbose)
+      #return FileUtils.send(sym, *args)
+    rescue => ex
+      $stderr.printf("ERROR: futils_%s: (%s) %s\n", sym.to_s, ex.class.name, ex.message)
+    end
   end
 
   def futils_mv(src, dest)
-    begin
-      wrapfutils("mv", src, dest)
-    rescue => ex
-      $stderr.printf("ERROR: (%s) %s\n", ex.class.name, ex.message)
-    end
+    wrapfutils("mv", src, dest)
   end
 
-  # old version just rm -rf'd. this one is slower, but
-  # accurately checks whether or not the directories
-  # a) are actually directories
-  # b) are actually empty
   def futils_rmdir(dir)
-    symcnt = 0
-    $stderr.printf("futils_rmdir:%p\n", dir)
-    #if we reached this point (see below, leftover check), then
-    # there's nothing else to do. not without running into an infinite loop.
-    if File.symlink?(dir) then
-      return
-    end
-    if Dir.empty?(dir) then
-      wrapfutils("rmdir", dir)
-    else
-      Dir.entries(dir).each do |itm|
-        next if ((itm == ".") || (itm == ".."))
-        itm = File.join(dir, itm)
-        $stderr.printf("rmdir.deep:itm=%p\n", itm)
-        if File.symlink?(itm) then
-          symcnt += 1
-        elsif File.directory?(itm) then
-          if Dir.empty?(itm) then
-            wrapfutils("rmdir", itm)
-          else
-            futils_rmdir(itm)
-          end
-        end
-      end
-      if symcnt == 0 then
-        # check for leftovers
-        if Dir.empty?(dir) then
-          wrapfutils("rmdir", dir)
-        else
-          futils_rmdir(dir)
-        end
-      end
-    end
+    wrapfutils("rmdir", dir)
   end
 
   def error(fmt, *args)
@@ -97,84 +58,70 @@ class MVMergeProgram
 
   # in theory, this does roughly, sort-of, what `rsync -av <src> <dest>` does.
   # but in a uh, less broken way (don't quote me on that)
-  def mergedirs(src, dest)
-    realsrc = File.absolute_path(src)
-    realdest = File.absolute_path(dest)
-    srcbase = gbasename(src)
-    srcdest = File.join(realdest, srcbase)
-    if not File.exist?(srcdest) then
-      futils_mv(src, srcdest)
-    elsif File.file?(srcdest) || File.symlink?(src) then
-      # fixme: this is a bogey - but also recursive logic:
-      #        will fail (sometimes?) when mergedirs is called recursively.
-      if File.stat(srcdest) == @statself then
-        error("cannot merge %p with itself\n", srcdest)
-      else
-        if (@opts.force == true) then
-          futils_mv(src, dest)
-        else
-          if @opts.skipexisting == false then
-            error("destination %p is a file", srcdest, realsrc)
-            return false
-          end
+  # mergedirs("ms_multiplan_for_xenix/usr", ".")
+  def mergedirs_rename(src, dest)
+    $stderr.printf("mergedirs_rename(%p, %p)\n", src, dest)
+    basename = File.basename(src)
+    odest = File.join(dest, basename)
+    if File.exist?(odest) then
+      ndest = odest
+      ci = 1
+      while File.exist?(odest)
+        tmp = sprintf("%s.%d", odest, ci)
+        ci += 1
+        if not File.exist?(tmp) then
+          ndest = tmp
+          break
         end
       end
-    elsif File.directory?(srcdest) && (not File.symlink?(srcdest)) then
-      # this where we want to merge!!
-      if File.directory?(realsrc) then
-        Dir.entries(realsrc).each do |item|
-          next if item.match(/^\.\.?$/)
-          realitem = File.join(realsrc, item)
-          #$stderr.printf("recursive: mergedirs(%p, %p)\n", realitem, srcdest)
-          if File.directory?(realitem) then
-            realitem = (realitem + "/")
-          end
-          if not mergedirs(realitem, srcdest) then
-            if not @opts.keepgoing then
-              return false
-            end
-          end
+      $stderr.printf("destination path %p exists, renaming to %p\n", odest, ndest)
+      odest = ndest
+    end
+    futils_mv(src, odest)
+  end
+
+  def mergedirs_children(sourcedir, destdir)
+    $stderr.printf("mergedirs_children(%p, %p)\n", sourcedir, destdir)
+    Dir.foreach(sourcedir) do |itm|
+      next if %w(. ..).include?(itm)
+      fullitm = File.join(sourcedir, itm)
+      mergedirs_merge(fullitm, destdir)
+    end
+    if Dir.empty?(sourcedir) then
+      futils_rmdir(sourcedir)
+    end
+  end
+
+  def mergedirs_merge(src, dest)
+    $stderr.printf("mergedirs_merge(%p, %p)\n", src, dest)
+    basename = File.basename(src)
+    odest = File.join(dest, basename)
+    if File.exist?(odest) then
+      if File.file?(odest) then
+        return mergedirs_rename(src, dest)
+      else
+        if File.directory?(odest) && (not File.symlink?(odest)) then
+          return mergedirs_children(src, odest)
         end
       end
     else
-      error("destination %p is an unrecognized item (are you sure you know what you're doing?)")
-      return false
+      futils_mv(src, dest)
     end
-    return true
   end
 
   def do_merge(sources, dest)
-    rc = 0
-    @statself = File.stat(dest)
+    $stderr.printf("do_merge(%p, %p)\n", sources, dest)
+    fulldest = File.absolute_path(dest)
     sources.each do |src|
-      if File.directory?(src) || File.file?(src) then
-        if File.file?(src) then
-          futils_mv(src, dest)
-        else
-          if mergedirs(src, dest) then
-            if File.directory?(src) then
-              futils_rmdir(src)
-            end
-          else
-            error("copy+merge of %p to %p failed?", src, dest)
-            rc = 1
-          end
-        end
-      else
-        error("%p is neither a regular file, nor a directory", src)
-        if src.include?('*') then
-          error("maybe the directories are empty?")
-        end
-        rc = 1
-      end
+      fullsrc = File.absolute_path(src)
+      mergedirs_merge(src, dest)
     end
-    exit(rc)
   end
 end
 
 begin
   opts = OpenStruct.new({
-    verbose: false,
+    verbose: true,
     keepgoing: false,
     force: false,
     skipexisting: false,

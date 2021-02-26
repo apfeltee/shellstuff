@@ -28,6 +28,8 @@ class FileFind
     @ignorecase = (@opts.ignorecase == true)
     @delfiles = (@opts.deletefiles == true)
     @printsize = (@opts.printsize == true)
+    @sortsize = (@opts.sortsize == true)
+    @cache = {}
     if @asregex then
       @patterns.map!{|pat| Regexp.new(pat, (@ignorecase ? "i" : nil)) }
     end
@@ -73,7 +75,7 @@ class FileFind
     return true
   end
 
-  def outsize(path)
+  def getsize(path)
     sz = (
       begin
         File.size(path)
@@ -81,15 +83,24 @@ class FileFind
         0
       end
     )
+    return sz
+  end
+
+  def outsize(sz)
     $stdout.printf("%s\t", size_to_readable(sz))
   end
 
   def outwrite(path)
-    if @printsize then
-      outsize(path)
+    sz = getsize(path)
+    if @printsize && @sortsize then
+      @cache[path] = sz
+    else
+      if @printsize then
+        outsize(sz)
+      end
+      $stdout.puts(path)
+      $stdout.flush
     end
-    $stdout.puts(path)
-    $stdout.flush
   end
 
   def delfile(path)
@@ -119,6 +130,13 @@ class FileFind
         end
       end
     end
+    if @sortsize then
+      @cache.sort_by{|_, sz| sz}.each do |path, sz|
+        outsize(sz)
+        $stdout.printf("%s\n", path)
+        $stdout.flush
+      end
+    end
   end
 
 end
@@ -131,6 +149,7 @@ begin
     onlydirs: false,
     ignorecase: false,
     printsize: false,
+    sortsize: true,
   })
   OptionParser.new{|prs|
     prs.on("-p<pat>", "set pattern"){|s|

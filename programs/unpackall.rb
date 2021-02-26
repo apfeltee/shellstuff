@@ -33,12 +33,14 @@ end
 class UnpackAll
   def initialize(opts)
     @opts = opts
+    @afiles = []
     @failed = []
     @failfh = nil
     @processedfh = nil
+    @count = 0
     @flines = 0
     if @opts.failfile != nil then
-      @failfh = File.open(@opts.failfile, "wb")
+      @failfh = File.open(@opts.failfile, "ab")
     end
     if @opts.processedfile != nil then
       @processedfh = File.open(@opts.processedfile, "ab")
@@ -263,6 +265,7 @@ class UnpackAll
     Dir.chdir(dir) do
       #if system("win7z", "x", "-y", "-pfuckoff", base, "-o#{stem}") then
       odir = make_outdir(dir, stem)
+      @count += 1
       if run_extractor(ext.downcase[1 .. -1], dir, base, odir, idx, ac) then
         delfile(base)
         if File.directory?(odir) then
@@ -300,20 +303,26 @@ class UnpackAll
     end
   end
 
+  def addfile(path)
+    extn = File.extname(path.scrub).downcase
+    if path.scrub.match?(PKGRE) || @opts.extraexts.include?(extn) then
+      note("found %p", path)
+      @afiles.push(path)
+    end
+  end
+
   def walk(dir)
     note("scanning %p ...", dir)
-    afiles = []
     Find.find(dir) do |path|
       next unless File.file?(path)
-      extn = File.extname(path).downcase
-      if path.scrub.match?(PKGRE) || @opts.extraexts.include?(extn) then
-        note("found %p", path)
-        afiles.push(path)
-      end
+      addfile(path)
     end
-    acount = afiles.length
+  end
+
+  def run
+    acount = @afiles.length
     note("found %d files", acount)
-    afiles.each.with_index do |file, i|
+    @afiles.each.with_index do |file, i|
       if @opts.findonly then
         $stdout.puts(file)
       else
@@ -338,6 +347,10 @@ class UnpackAll
     if @failed.empty? && (@opts.failfile != nil) && File.file?(@opts.failfile) then
       File.delete(@opts.failfile)
     end
+    if @count == 0 then
+      return false
+    end
+    return true
   end
 
 end
@@ -375,12 +388,16 @@ begin
     findonly: false,
     failfile: nil,
     processedfile: nil,
+    inputfile: nil,
     extraexts: [],
   })
   OptionParser.new{|prs|
     prs.on("-h", "--help", "show this help and exit"){
       puts(prs.help)
       exit(0)
+    }
+    prs.on("-i<file>"){|v|
+      opts.inputfile = v
     }
     prs.on("-r", "--regex", "print regex used to find files, and exit"){
       puts(PKGRE)
@@ -410,13 +427,6 @@ begin
     }
     prs.on("-f<path>", "--fail=<path>", "write paths of archives that failed to extract to <path>"){|v|
       opts.failfile = v
-      if File.exist?(v) then
-        if File.directory?(v) then
-          $stderr.printf("unpackall: --fail: path %p is a directory\n", v)
-        end
-        $stderr.printf("unpackall: --fail: refusing to overwrite an existing path\n")
-        exit(1)
-      end
     }
     prs.on("-e<s>", "--ext=<s>", "add to list of extensions to search"){|v|
       v.strip!
@@ -425,19 +435,28 @@ begin
     }
   }.parse!
   ua = UnpackAll.new(opts)
-  if ARGV.empty? then
+  if ARGV.empty? && (opts.inputfile == nil) then
     fail("need to specify a directory")
   else
-    begin
-      ARGV.each do |arg|
-        if File.directory?(arg) then
-          ua.walk(arg)
-        else
-          ua.complain("not a directory %p\n", arg)
-        end
+    if opts.inputfile != nil then
+      File.foreach(opts.inputfile) do |line|
+        line.strip!
+        next if line.empty?
+        next unless File.file?(line)
+        ua.addfile(line)
       end
+    end
+    ARGV.each do |arg|
+      if File.directory?(arg) then
+        ua.walk(arg)
+      else
+        ua.complain("not a directory %p\n", arg)
+      end
+    end
+    begin
+      ua.run
     ensure
-      ua.status
+      exit(ua.status)
     end
   end
 end

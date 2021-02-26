@@ -290,6 +290,37 @@ def check
   end
 end
 
+def cleanpath
+  removeme = [
+    File.join(ENV["HOME"], "bin"),
+    "/cygdrive/c/cloud/local/dev/clangfix/bin",
+  ]
+  pushme = [
+    "/cygdrive/c/progra~1/llvm/bin",
+  ]
+  stats = []
+  removeme.each do |ritm|
+    if (st = (File.stat(ritm) rescue nil)) != nil then
+      stats.push(st)
+    end
+  end
+  if not stats.empty? then
+    npath = [*pushme]
+    ENV["PATH"].split(":").each do |itm|
+      itm.strip!
+      next if itm.empty?
+      if (st = (File.stat(itm) rescue nil)) != nil then
+        if not stats.include?(st) then
+          npath.push(itm)
+        else
+          $stderr.printf("cleanpath: filtering out %p\n", itm)
+        end
+      end
+    end
+    ENV["PATH"] = npath.join(":")
+  end
+end
+
 def listcommands
   myname = File.basename($0)
   $stderr.printf("other available commands:\n")
@@ -318,6 +349,8 @@ begin
     else
       dv = get_configfile(wantedprog)
       cmd = [WINPYTHON, empath, *dv, *ARGV]
+      cleanpath()
+      p ENV["PATH"].split(":")
       $stderr.printf("cmd: %s\n", cmd.join(" "))
       exec(*cmd)
     end
