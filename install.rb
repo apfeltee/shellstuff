@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 
+require "optparse"
 require "fileutils"
 
 def chdir(dir, &b)
@@ -69,19 +70,34 @@ def do_dir(name)
   end
 end
 
+begin
+  dopersonal = false
+  OptionParser.new{|prs|
+    prs.on("-h", "-help"){
+      puts(prs.help)
+      exit(0)
+    }
+    prs.on("-p", "--personal", "also install personal scripts (probably useless, since paths are hardcoded)"){
+      dopersonal = true
+    }
+  }.parse!
 
-## first "install" native programs...
-chdir("native") do
-  if File.file?("Makefile") && system("make") then
-    system("make install")
+  if dopersonal then
+    do_dir("personal")
   end
-end
+  ## "install" native programs...
+  chdir("native") do
+    if File.file?("Makefile") && system("make") then
+      system("make install")
+    end
+  end
 
-## then, process scripts ...
-do_dir("programs")
-do_dir("others")
-if is_cygwin then
-  do_dir("cygwin")
-elsif is_linux then
-  do_dir("linux")
+  ## then, process scripts ...
+  do_dir("programs")
+  do_dir("others")
+  if is_cygwin then
+    do_dir("cygwin")
+  elsif is_linux then
+    do_dir("linux")
+  end
 end
