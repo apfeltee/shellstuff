@@ -22,18 +22,22 @@ require "fileutils"
 require "find"
 
 class MVMergeProgram
+  attr_reader :modified
+
   def initialize(opts)
     @opts = opts
     @statself = nil
     @done = []
+    @modified = 0
   end
 
   # just wraps FileUtils, so the -v flag takes action
   def wrapfutils(sym, *args)
+    #$stderr.printf("wrapfutils(%s, %p)\n", sym, args)
     begin
-      #$stderr.printf("%s(%p)\n", sym, args)
-      return FileUtils.send(sym, *args, verbose: @opts.verbose)
-      #return FileUtils.send(sym, *args)
+      rt = FileUtils.send(sym, *args, verbose: @opts.verbose)
+      @modified += 1
+      return rt
     rescue => ex
       $stderr.printf("ERROR: futils_%s: (%s) %s\n", sym.to_s, ex.class.name, ex.message)
     end
@@ -60,7 +64,7 @@ class MVMergeProgram
   # but in a uh, less broken way (don't quote me on that)
   # mergedirs("ms_multiplan_for_xenix/usr", ".")
   def mergedirs_rename(src, dest)
-    $stderr.printf("mergedirs_rename(%p, %p)\n", src, dest)
+    #$stderr.printf("mergedirs_rename(%p, %p)\n", src, dest)
     basename = File.basename(src)
     odest = File.join(dest, basename)
     if File.exist?(odest) then
@@ -81,7 +85,7 @@ class MVMergeProgram
   end
 
   def mergedirs_children(sourcedir, destdir)
-    $stderr.printf("mergedirs_children(%p, %p)\n", sourcedir, destdir)
+    #$stderr.printf("mergedirs_children(%p, %p)\n", sourcedir, destdir)
     Dir.foreach(sourcedir) do |itm|
       next if %w(. ..).include?(itm)
       fullitm = File.join(sourcedir, itm)
@@ -93,15 +97,19 @@ class MVMergeProgram
   end
 
   def mergedirs_merge(src, dest)
-    $stderr.printf("mergedirs_merge(%p, %p)\n", src, dest)
+    #$stderr.printf("mergedirs_merge(%p, %p)\n", src, dest)
     basename = File.basename(src)
     odest = File.join(dest, basename)
     if File.exist?(odest) then
-      if File.file?(odest) then
+      if File.symlink?(odest) then
+        $stderr.printf("destination path %p is a symbolic link\n", odest)
+      elsif File.file?(odest) then
         return mergedirs_rename(src, dest)
       else
-        if File.directory?(odest) && (not File.symlink?(odest)) then
-          return mergedirs_children(src, odest)
+        if File.directory?(src) then
+          if File.directory?(odest) && (not File.symlink?(odest)) then
+            return mergedirs_children(src, odest)
+          end
         end
       end
     else
@@ -110,10 +118,12 @@ class MVMergeProgram
   end
 
   def do_merge(sources, dest)
-    $stderr.printf("do_merge(%p, %p)\n", sources, dest)
+    return if File.symlink?(dest)
+    #$stderr.printf("do_merge(%p, %p)\n", sources, dest)
     fulldest = File.absolute_path(dest)
     sources.each do |src|
       fullsrc = File.absolute_path(src)
+      next if File.symlink?(fullsrc)
       mergedirs_merge(src, dest)
     end
   end
@@ -161,6 +171,7 @@ begin
         exit(1)
       end
     end
+    exit((mmg.modified > 0) ? 0 : 1)
   end
 end
 

@@ -143,11 +143,14 @@ class UnZlib
         if buflen == 0 then
           verbose("buffer is null!")
         end
-
       end
-        bycompr += buflen
+      bycompr += buflen
+      begin
         inflated = zi.inflate(buf)
         bydecompr += outio.write(inflated)
+      #rescue => ex
+        #$stderr.printf("inflate: (%s) %s\n", ex.class.name, ex.message)
+      end
     }
     begin
       while true do
@@ -190,7 +193,9 @@ class UnZlib
           destfile = Dir::Tmpname.make_tmpname([File.join(File.dirname(origdest), infile)], nil)
           warn("destination file %p already exists -- renamed to %p", origdest, destfile)
         else
-          fail("destination file %p already exists", destfile)
+          if not File.empty?(destfile) then
+            fail("destination file %p already exists", destfile)
+          end
         end
       end
       verbose("inflating %p -> %p", infile, destfile)

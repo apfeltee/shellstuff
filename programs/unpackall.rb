@@ -7,6 +7,7 @@ require "fileutils"
 require "find"
 require "shellwords"
 require "open3"
+require "parallel"
 
 # mapping for archives that 7z can't handle (yet)
 # name_of_function => list_of_file_extensions
@@ -23,7 +24,13 @@ EXES = {
   do_lzx: ["lzx"],
 }
 
-PKGRE = /\.(zip|rar|7z|tar|arj|dsk|cpio|pax|#{EXES.values.flatten.join("|")})$/i
+COMPRESSED = %w(
+  gz tgz Z
+  bz2 tbz2
+  lz tlz
+  xz txz zst
+)
+PKGRE = /\.(zip|rar|7z|tar|arj|dsk|cpio|pax|#{EXES.values.flatten.join("|")}|#{COMPRESSED.join("|")})$/i
 
 def fail(fmt, *a)
   $stderr.printf("ERROR: %s\n", sprintf(fmt, *a))
@@ -40,7 +47,8 @@ class UnpackAll
     @count = 0
     @flines = 0
     if @opts.failfile != nil then
-      @failfh = File.open(@opts.failfile, "ab")
+      mode = (if File.file?(@opts.failfile) then "ab" else "wb" end)
+      @failfh = File.open(@opts.failfile, mode)
     end
     if @opts.processedfile != nil then
       @processedfh = File.open(@opts.processedfile, "ab")
@@ -254,7 +262,7 @@ class UnpackAll
     }
   end
 
-  def unzip(file, idx, ac)
+  def unzip_real(file, idx, ac)
     base = File.basename(file)
     ext = File.extname(base)
     stem = File.basename(base, ext)
@@ -265,7 +273,6 @@ class UnpackAll
     Dir.chdir(dir) do
       #if system("win7z", "x", "-y", "-pfuckoff", base, "-o#{stem}") then
       odir = make_outdir(dir, stem)
-      @count += 1
       if run_extractor(ext.downcase[1 .. -1], dir, base, odir, idx, ac) then
         delfile(base)
         if File.directory?(odir) then
@@ -303,6 +310,19 @@ class UnpackAll
     end
   end
 
+  # for concurrency, the process must be forked, because Dir.chdir is /not/ concurrent!
+  def unzip(file, idx, ac)
+    @count += 1
+    if @opts.threads > 1 then
+      $stderr.printf("forking...\n")
+      fork do
+        unzip_real(file, idx, ac)
+      end
+    else
+      unzip_real(file, idx, ac)
+    end
+  end
+
   def addfile(path)
     extn = File.extname(path.scrub).downcase
     if path.scrub.match?(PKGRE) || @opts.extraexts.include?(extn) then
@@ -312,7 +332,7 @@ class UnpackAll
   end
 
   def walk(dir)
-    note("scanning %p ...", dir)
+    $stderr.printf("scanning %p ...\n", dir)
     Find.find(dir) do |path|
       next unless File.file?(path)
       addfile(path)
@@ -322,12 +342,14 @@ class UnpackAll
   def run
     acount = @afiles.length
     note("found %d files", acount)
-    @afiles.each.with_index do |file, i|
+    i = 0
+    Parallel.each(@afiles, in_threads: @opts.threads) do |file|
       if @opts.findonly then
         $stdout.puts(file)
       else
         unzip(file, i, acount)
       end
+      i += 1
     end
   end
 
@@ -390,6 +412,7 @@ begin
     processedfile: nil,
     inputfile: nil,
     extraexts: [],
+    threads: 1,
   })
   OptionParser.new{|prs|
     prs.on("-h", "--help", "show this help and exit"){
@@ -432,6 +455,11 @@ begin
       v.strip!
       v = (if (v[0] != '.') then ('.' + v) else v end)
       opts.extraexts.push(v)
+    }
+    prs.on("-t<n>", "--threads=<n>", "run <n> threads concurrently"){|v|
+      i = v.to_i
+      i = (if ((i < 0) || (i == 0)) then 1 else i end)
+      opts.threads = i
     }
   }.parse!
   ua = UnpackAll.new(opts)

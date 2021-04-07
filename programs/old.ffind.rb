@@ -2,7 +2,7 @@
 
 require "ostruct"
 require "optparse"
-require "open3"
+require "find"
 
 def size_to_readable(size)
   # byte, kilobyte, megabyte, gigabyte, terabyte, petabyte, exabyte, zettabyte
@@ -18,84 +18,9 @@ def size_to_readable(size)
   return sprintf('%.1f%s', (size.to_f / (1024 ** exp)), units[exp])
 end
 
-class FindCommand
-  def initialize
-    @cmd = ["find"]
-    @dirs = []
-    @type = nil
-    @predinames = []
-    @prediregex = []
-    @actions = []
-  end
-
-  def type(c)
-    @type = c
-  end
-
-  def dir(*a)
-    @dirs.push(*a)
-  end
-
-  def iname(*a)
-    @predinames.push(*a)
-  end
-
-  def iregex(*rxes)
-    rxes.each do |rx|
-      @prediregex.push('.*/' + "#{rx}")
-    end
-  end
-
-  def build
-    haveiname = (@predinames.length > 0)
-    haverx = (@prediregex.length > 0)
-    cmd = ["find", *@dirs]
-    if @type != nil then
-      cmd.push("-type", @type)
-    end
-    if haverx then
-      cmd.push("-regextype", "awk")    
-    end
-    if haveiname then
-      @predinames.each_with_index do |iname, i|
-        cmd.push("(", "-iname", iname, ")")
-        if (i + 1) != @predinames.length then
-          cmd.push("-o")
-        end
-      end
-    end
-    if haverx then
-      @prediregex.each_with_index do |irx, i|
-        cmd.push("(", "-iregex", irx, ")")
-        if (i + 1) != @prediregex.length then
-          cmd.push("-o")
-        end
-      end
-    end
-    $stderr.printf("build: %p\n", cmd)
-    return cmd
-  end
-
-  def run(&b)
-    cmd = build()
-    Open3.popen2(*cmd) do |stdin, stdout, thr|
-      stdout.each_line do |ln|
-        #$stderr.printf("ln: %p\n", ln)
-        ln = ln.slice(0, ln.length - 1)
-        if ln[-1] == "\r" then
-          ln = ln.slice(0, ln.length - 1)
-        end
-        #$stderr.printf("calling: %p\n", ln)
-        b.call(ln)
-      end
-    end
-  end
-end
-
 class FileFind
   def initialize(opts)
     @opts = opts
-    @fc = FindCommand.new
     @onlyfiles = (@opts.onlyfiles == true)
     @onlydirs = (@opts.onlydirs == true)
     @patterns = @opts.patterns
@@ -106,7 +31,7 @@ class FileFind
     @sortsize = (@opts.sortsize == true)
     @cache = {}
     if @asregex then
-      #@patterns.map!{|pat| Regexp.new(pat, (@ignorecase ? "i" : nil)) }
+      @patterns.map!{|pat| Regexp.new(pat, (@ignorecase ? "i" : nil)) }
     end
   end
 
@@ -191,7 +116,7 @@ class FileFind
     end
   end
 
-  def oldmain(dirs)
+  def main(dirs)
     $stdout.sync = true
     if dirs.empty? then
       dirs.push(".")
@@ -214,40 +139,6 @@ class FileFind
     end
   end
 
-  def main(dirs)
-    fc = FindCommand.new
-    fc.dir(*dirs)
-    fc.type(
-      if @opts.onlyfiles then
-        'f'
-      elsif @opts.onlydirs then
-        'd'
-      elsif @opts.onlylinks then
-        'l'
-      end
-    )
-    if @opts.asregex then
-      fc.iregex(*@opts.patterns)
-    else
-      fc.iname(*@opts.patterns)
-    end
-    fc.run do |path|
-      if ismatch(path) then
-        if @delfiles then
-          delfile(path)
-        else
-          outwrite(path)
-        end
-      end
-    end
-    if @sortsize then
-      @cache.sort_by{|_, sz| sz}.each do |path, sz|
-        outsize(sz)
-        $stdout.printf("%s\n", path)
-        $stdout.flush
-      end
-    end
-  end
 end
 
 begin

@@ -79,6 +79,7 @@ end
 
 ## then, process scripts ...
 do_dir("programs")
+do_dir("others")
 if is_cygwin then
   do_dir("cygwin")
 elsif is_linux then

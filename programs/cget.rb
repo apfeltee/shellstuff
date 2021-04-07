@@ -45,6 +45,7 @@ class CGet
     @content_ishtml = false
     @can_write = false
     @have_warned = false
+    $stderr.printf("cget:url: %p\n", url)
     configure
     @curl.on_header{|data| handle_header(data) }
     @curl.on_body{ |data| handle_body(data) }
@@ -205,11 +206,11 @@ class CGet
   def parse_content_disposition(hd)
     parts = hd.split(":").map(&:strip).reject(&:empty?)
     parts.shift
-    if (m = parts[0].match(/\w+\s*;\s*filename=([\x22\x27])?(?<filename>.+)([\x22\x27])?/i)) == nil then
+    if (m = parts[0].match(/filename=(?:"(.*?)"|([^;\r\n]*))/i)) == nil then
       msg("ERROR: failed to parse content-disposition header: %p", hd)
       exit(1)
     else
-      fn = m["filename"].strip
+      fn = m[1].strip
       while (fn.match?(rxbegin=/^["'\/\\]/) || fn.match?(rxend=/["'\/\\]$/)) do
         if fn.match?(rxbegin) then
           fn = fn[1 .. -1]
@@ -268,7 +269,12 @@ class CGet
   end
 
   def run
-    @curl.perform
+    begin
+      @curl.perform
+    rescue => ex
+      $stderr.printf("EXCEPTION: (%s) %s\n", ex.class.name, ex.message)
+      @can_write = false
+    end
   end
   
 end

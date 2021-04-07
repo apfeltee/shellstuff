@@ -78,7 +78,9 @@ def moveto(srcdir, basename, item, dest)
   destp = File.join(dest, basename)
   if File.exist?(destp) then
     if File.directory?(destp) then
-      return system("mvmerge", "-fv", item, dest)
+      r = system("mvmerge", "-fv", item, dest)
+      #$stderr.printf("r = %p\n", r)
+      return r
     else
       newname = make_newname(srcdir, destp)
       $stderr.printf("warning: a file named %p already exists! file will be renamed to %p\n", basename, newname)
@@ -98,7 +100,11 @@ def handle(dir)
     $stderr.printf("cannot use mvsingle in the same directory as mvsingle!\n")
   else
     Dir.chdir(dir) do
-      Dir.glob("*") do |path|
+      #Dir.glob("*") do |path|
+      Dir.foreach(".") do |itm|
+        next if %w(. ..).include?(itm)
+        #path = File.join(dir, itm)
+        path = File.absolute_path(itm)
         next unless File.directory?(path)
         next if File.symlink?(path)
         if (sfile=is_single(path)) != nil then
@@ -108,13 +114,14 @@ def handle(dir)
             mvfile(dir, path, npath)
             path = npath
             sfile = File.join(path, sfbase)
+            ci += 1
           end
           if moveto(dir, sfbase, sfile, ".") then
+            ci += 1
             if Dir.empty?(path) then
               deldir(dir, path)
             end
           end
-          ci += 1
         end
       end
     end

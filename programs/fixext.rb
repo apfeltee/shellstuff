@@ -6,7 +6,8 @@ require "find"
 require "mimemagic"
 require "mimemagic/overlay"
 # gem ruby-magic
-#require "magic"
+require "magic"
+require "pry-byebug"
 
 #$SAFE = 1
 KNOWN_EXTENSIONS = <<__EOF__
@@ -23,6 +24,7 @@ application/x-gzip : .gz
 application/x-bzip2 : .bz2
 application/x-shockwave-flash : .swf
 application/x-dosexec : .exe
+application/x-ms-dos-executable : .exe
 
 application/zip : .zip
 application/msword : .doc
@@ -163,7 +165,7 @@ def fail(fmt, *a, **kw)
   exit(1)
 end
 
-require "magic"
+
 
 
 class RbFile
@@ -245,6 +247,7 @@ class FixExtensions
     File.open(filepath, "rb") do |fh|
       mime = @rbfile.get_mime(fh)
       $stderr.printf("get_mime=%p\n", mime)
+      #binding.pry
       if (mime == nil) || (mime == []) then
         return Wrapper.new(nil, [])
       end
@@ -255,7 +258,7 @@ class FixExtensions
         else
           mime
         end
-      ).split(";")[0].strip
+      ).type.split(";")[0].strip
       return Wrapper.new(realmime, [])
     end
   end
@@ -263,6 +266,7 @@ class FixExtensions
   def get_mime_via_mimetype(filepath)
     File.open(filepath, "rb") do |ofh|
       rt = MimeMagic.by_magic(ofh)
+      $stderr.printf("via_mimetype(%p) = %p\n", filepath, rt)
       if (rt == nil) || (rt == "") || (rt == []) then
         return nil
       end
@@ -272,7 +276,7 @@ class FixExtensions
 
   def get_mime(filepath, hasext)
     begin
-      mi = get_mime_via_mimetype(filepath)
+      mi = get_mime_via_rubymagic(filepath)
       if mi == nil then
         if hasext && (@opts.force == false) then
           # if mimemagic failed, but file already has an extension, then
@@ -282,10 +286,11 @@ class FixExtensions
           #$stderr.printf("-- get_mime_via_mimetype returned nil for %p\n", filepath)
           #return get_mime_via_filecmd(filepath)
           #return Wrapper.new(nil, [])
-          return get_mime_via_rubymagic(filepath)
+          rt = get_mime_via_mimetype(filepath)
+          return Wrapper.new(mi.type.split(";").first.strip, mi.extensions)
         end
       end
-      return Wrapper.new(mi.type.split(";").first.strip, mi.extensions)
+      return mi
     rescue => ex
       $stderr.printf("get_mime error: (%s) %s\n", ex.class.name, ex.message)
       return Wrapper.new(nil, [])
