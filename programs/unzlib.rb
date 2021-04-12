@@ -148,8 +148,8 @@ class UnZlib
       begin
         inflated = zi.inflate(buf)
         bydecompr += outio.write(inflated)
-      #rescue => ex
-        #$stderr.printf("inflate: (%s) %s\n", ex.class.name, ex.message)
+      rescue => ex
+        $stderr.printf("inflate: (%s) %s\n", ex.class.name, ex.message)
       end
     }
     begin

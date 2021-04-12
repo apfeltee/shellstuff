@@ -32,6 +32,11 @@ $EDARGS = []
 # how many arguments on average to use. 128 seems like a sensible default
 $MAXARGS = 128
 
+def wslpath(winpath)
+  drv = winpath[0]
+  return sprintf("/mnt/%s/%s", drv, winpath[3 .. -1])
+end
+
 def shell(*args, &callback)
   Open3.popen3(*args) do |stdin, stdout, stderr|
     if callback then
@@ -49,9 +54,15 @@ end
 class OpenEditor
   def initialize(opts)
     @opts = opts
-    @is_cygwin = is_cygwin
     @editor = $EDITOR
     @editme = []
+    
+    @iswsl = (ENV["WSL_DISTRO_NAME"] != nil)
+      @iscygwin = check_iscygwin
+
+    if @iswsl then
+      @editor = wslpath(@editor)
+    end
   end
 
   def complain(fmt, *args)
@@ -65,7 +76,10 @@ class OpenEditor
     $stderr.printf("warning: %s\n", str)
   end
 
-  def is_cygwin
+  def check_iscygwin
+    if @iswsl then
+      return false
+    end
     shell("uname", "-s") do |_, stdout, _|
       return stdout.read.downcase.match(/cygwin/)
     end
@@ -92,7 +106,11 @@ class OpenEditor
   def get_windowspath(path)
     subrx = /^\/cygdrive\/(\w)\//
     path = get_realpath(path.gsub(/^\\\?\?\\/, ""))
-    if @is_cygwin then
+    if @iswsl then
+      shell("wslpath", "-am", path) do |stdin, stdout, stderr|
+        return stdout.read.strip
+      end
+    elsif @iscygwin then
       # in this case, path is eg "/cygdrive/c/some/long/path/somefile.ext" 
       if path.match(subrx) then
         return path.gsub(subrx, '\1:/').gsub(/\//, '\\')

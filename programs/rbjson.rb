@@ -8,7 +8,7 @@ require "json"
 def work(opts, name, hnd)
   begin
     data = JSON.load(hnd)
-    if opts.checkonly then
+    if opts.checkonly || opts.noprint then
       if not opts.noprint then
         print(JSON.dump(data))
       end

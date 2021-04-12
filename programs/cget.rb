@@ -206,11 +206,11 @@ class CGet
   def parse_content_disposition(hd)
     parts = hd.split(":").map(&:strip).reject(&:empty?)
     parts.shift
-    if (m = parts[0].match(/filename=(?:"(.*?)"|([^;\r\n]*))/i)) == nil then
+    if (m = parts[0].match(/filename=(?:"(?<filename>.*?)"|(?<filename>[^;\r\n]*))/i)) == nil then
       msg("ERROR: failed to parse content-disposition header: %p", hd)
       exit(1)
     else
-      fn = m[1].strip
+      fn = m["filename"].strip
       while (fn.match?(rxbegin=/^["'\/\\]/) || fn.match?(rxend=/["'\/\\]$/)) do
         if fn.match?(rxbegin) then
           fn = fn[1 .. -1]
