@@ -150,6 +150,7 @@ def do7zlist(file, opts, &b)
     chunk = []
     stdin.close
     stdout.each_line do |ln|
+      ln.scrub!
       ln.strip!
       if ln.empty? && (chunk.size > 0) then
         b.call(parse(chunk.join("\n")))

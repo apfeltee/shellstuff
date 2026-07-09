@@ -3,11 +3,8 @@
 require "ostruct"
 require "optparse"
 require "find"
-require "mimemagic"
-require "mimemagic/overlay"
-# gem ruby-magic
-require "magic"
-require "pry-byebug"
+
+#require "pry-byebug"
 
 #$SAFE = 1
 KNOWN_EXTENSIONS = <<__EOF__
@@ -19,7 +16,16 @@ image/x-ms-bmp : .bmp
 image/x-icon : .ico
 image/x-tga : .tga
 image/webp : .webp
+image/svg+xml : .svg
+image/avif : .avif
 
+
+audio/flac : .flac
+
+font/woff2 : .woff
+
+
+application/json : .json
 application/x-gzip : .gz
 application/x-bzip2 : .bz2
 application/x-shockwave-flash : .swf
@@ -36,7 +42,8 @@ application/java-archive : .jar
 
 application/vnd.ms-cab-compressed : .cab
 
-#application/octet-stream: .class
+application/octet-stream: .dat
+
 #application/x-java-applet : .applet
 
 application/x-sharedlib : .so
@@ -46,6 +53,11 @@ application/vnd.ms-powerpoint : .ppt
 
 text/x-c++ : .cpp
 text/x-c: .c
+
+# this may be in error
+text/x-csrc: .js
+
+
 text/x-asm: .asm
 text/x-tex: .tex
 text/x-perl: .pl
@@ -166,59 +178,6 @@ def fail(fmt, *a, **kw)
 end
 
 
-
-
-class RbFile
-  def initialize
-  end
-
-  def close
-  end
-
-  # in some rare cases, #descriptor returns empty values
-  # this function checks for that, and filters them appropiately.
-  def postgetcheck(val)
-    if val.is_a?(Array) then
-      if val == [] then
-        return nil
-      end
-      first = val[0]
-      if (first == nil) || (first == "") then
-        return postgetcheck(val[1])
-      end
-    else
-      if val.is_a?(String) then
-        if val.strip == "" then
-          return nil
-        end
-      end
-    end
-    return val
-  end
-
-  def get(flag, fh)
-    return MimeMagic.by_magic(fh)
-=begin
-    oflag = @magic.flags
-    begin
-      @magic.flags = flag
-      return postgetcheck(@magic.descriptor(fh.fileno))
-    ensure
-      @magic.flags = oflag
-    end
-=end
-  end
-
-  def get_mime(fh)
-    #return get(Magic::MIME | Magic::CONTINUE, fh)
-    return get(0, fh)
-  end
-
-  def get_description(fh)
-    return get(Magic::CHECK, fh)
-  end
-end
-
 class FixExtensions
   attr_reader :leftovers
 
@@ -233,7 +192,6 @@ class FixExtensions
     @opts = opts
     @extmap = parse(KNOWN_EXTENSIONS)
     @leftovers = Hash.new{|h, k| h[k]=[]}
-    @rbfile = RbFile.new
   end
 
   def get_mime_via_filecmd(filepath)
@@ -243,58 +201,11 @@ class FixExtensions
     return Wrapper.new(mimetype, [])
   end
 
-  def get_mime_via_rubymagic(filepath)
-    File.open(filepath, "rb") do |fh|
-      mime = @rbfile.get_mime(fh)
-      $stderr.printf("get_mime=%p\n", mime)
-      #binding.pry
-      if (mime == nil) || (mime == []) then
-        return Wrapper.new(nil, [])
-      end
-      #$stderr.printf("rubymagic: mime=%p\n", mime)
-      realmime = (
-        if mime.is_a?(Array) then
-          mime.first
-        else
-          mime
-        end
-      ).type.split(";")[0].strip
-      return Wrapper.new(realmime, [])
-    end
-  end
-
-  def get_mime_via_mimetype(filepath)
-    File.open(filepath, "rb") do |ofh|
-      rt = MimeMagic.by_magic(ofh)
-      $stderr.printf("via_mimetype(%p) = %p\n", filepath, rt)
-      if (rt == nil) || (rt == "") || (rt == []) then
-        return nil
-      end
-      return rt
-    end
-  end
-
   def get_mime(filepath, hasext)
-    begin
-      mi = get_mime_via_rubymagic(filepath)
-      if mi == nil then
-        if hasext && (@opts.force == false) then
-          # if mimemagic failed, but file already has an extension, then
-          # return dummy data, to keep old extension
-          return Wrapper.new(nil, [])
-        else
-          #$stderr.printf("-- get_mime_via_mimetype returned nil for %p\n", filepath)
-          #return get_mime_via_filecmd(filepath)
-          #return Wrapper.new(nil, [])
-          rt = get_mime_via_mimetype(filepath)
-          return Wrapper.new(mi.type.split(";").first.strip, mi.extensions)
-        end
-      end
-      return mi
-    rescue => ex
-      $stderr.printf("get_mime error: (%s) %s\n", ex.class.name, ex.message)
-      return Wrapper.new(nil, [])
-    end
+    #if hasext && (@opts.force == false) then
+      #return Wrapper.new(nil, [])
+    #end
+    return get_mime_via_filecmd(filepath)
   end
 
 
@@ -452,7 +363,7 @@ def main(opts, items)
           if opts.maxfiles == nil then
             ufiles
           else
-            maxfiles = ufiles[0 .. opts.maxfiles]
+            ufiles[0 .. opts.maxfiles]
           end
         )
         $stderr.printf("  %p:\n", mime)

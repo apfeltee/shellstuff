@@ -131,7 +131,7 @@ end
 
 begin
   opts = OpenStruct.new({
-    verbose: true,
+    verbose: false,
     keepgoing: false,
     force: false,
     skipexisting: false,

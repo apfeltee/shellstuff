@@ -27,6 +27,8 @@ begin
     $defaultargs.push("-NoProfile")
   end
   #exec "$powershell_exepath" "${nargs[@]}" "$@"
-  exec(*[$powershell_exepath, *$defaultargs, *rargv])
+  cmd = [$powershell_exepath, *$defaultargs, *rargv]
+  $stderr.printf("cmd: %p\n", cmd)
+  exec(*cmd)
   exit
 end

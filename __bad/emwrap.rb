@@ -3,10 +3,14 @@
 require "shellwords"
 
 WINPYTHON = "c:/scripting/python3/python.exe"
-EMSCRIPTENPATH ="C:/cloud/local/code/programs/emsdk/upstream/emscripten/"
+EMSCRIPTENPATH ="/cloud/local/code/programs/emsdk/upstream/emscripten/"
 
 DEFAULT_OPTS = {
   "WASM" => 0,
+  "DEMANGLE_SUPPORT" => 1,
+  # no longer supported, instead...
+  #"EMITTING_JS" => 0,
+  "STANDALONE_WASM" => 1,
 }
 
 VALID_EMSETTINGS = %w(
@@ -244,112 +248,126 @@ VALID_EMSETTINGS = %w(
   TEST_MEMORY_GROWTH_FAILS
 )
 
-def get_configfile(n)
-  vars = {}
-  rt = []
-  return rt unless %w(emcc em++).include?(n)
-  cfg = File.join(ENV["HOME"], ".emscripten")
-  if File.file?(cfg) then
-    File.foreach(cfg) do |line|
-      line.strip!
-      next if line.empty?
-      next if line[0] == '#'
-      next unless line.include?("=")
-      rest = line.split("=")
-      word = rest.shift.strip
-      next unless VALID_EMSETTINGS.include?(word)
-      reststr = rest.join("=").strip
-      begin
-        data = eval(reststr)
-        $stderr.printf("config: %s -> %p\n", word, data)
-        vars[word] = data
-      rescue => ex
-        $stderr.printf("config: failed to eval %p: (%s) %s\n", reststr, ex.class.name, ex.message)
-      end
-    end
-  end
-  DEFAULT_OPTS.each do |k, v|
-    if not vars.key?(k) then
-      vars[k] = v
-    end
-  end
-  vars.each do |k, v|
-    rt.push("-s", sprintf("%s=%p", k, v))
-  end
-  return rt
-end
+class EmWrap
+  attr_accessor :emscriptenpath, :python
 
-def check
-  if not File.directory?(EMSCRIPTENPATH) then
-    $stderr.printf("emscripten path %p does not exist!\n", EMSCRIPTENPATH)
-    exit(1)
-  end
-  if (not File.file?(WINPYTHON)) || (not File.executable?(WINPYTHON)) then
-    $stderr.printf("windows python executable %p is missing, or not executable!\n")
-    exit(1)
-  end
-end
-
-def cleanpath
-  removeme = [
-    File.join(ENV["HOME"], "bin"),
-    "/cygdrive/c/cloud/local/dev/clangfix/bin",
-  ]
-  pushme = [
-    "/cygdrive/c/progra~1/llvm/bin",
-  ]
-  stats = []
-  removeme.each do |ritm|
-    if (st = (File.stat(ritm) rescue nil)) != nil then
-      stats.push(st)
+  def initialize
+    @python = "c:/scripting/python3/python.exe"
+    @emscriptenpath = "c:/" + EMSCRIPTENPATH
+    if ENV["WSL_DISTRO_NAME"] then
+      @emscriptenpath = "/mnt/c/"+EMSCRIPTENPATH
+      @python = "/usr/bin/python3"
     end
   end
-  if not stats.empty? then
-    npath = [*pushme]
-    ENV["PATH"].split(":").each do |itm|
-      itm.strip!
-      next if itm.empty?
-      if (st = (File.stat(itm) rescue nil)) != nil then
-        if not stats.include?(st) then
-          npath.push(itm)
-        else
-          $stderr.printf("cleanpath: filtering out %p\n", itm)
+
+  def get_configfile(n)
+    vars = {}
+    rt = []
+    return rt unless %w(emcc em++).include?(n)
+    cfg = File.join(ENV["HOME"], ".emscripten")
+    if File.file?(cfg) then
+      File.foreach(cfg) do |line|
+        line.strip!
+        next if line.empty?
+        next if line[0] == '#'
+        next unless line.include?("=")
+        rest = line.split("=")
+        word = rest.shift.strip
+        next unless VALID_EMSETTINGS.include?(word)
+        reststr = rest.join("=").strip
+        begin
+          data = eval(reststr)
+          $stderr.printf("config: %s -> %p\n", word, data)
+          vars[word] = data
+        rescue => ex
+          $stderr.printf("config: failed to eval %p: (%s) %s\n", reststr, ex.class.name, ex.message)
         end
       end
     end
-    ENV["PATH"] = npath.join(":")
+    DEFAULT_OPTS.each do |k, v|
+      if not vars.key?(k) then
+        vars[k] = v
+      end
+    end
+    vars.each do |k, v|
+      rt.push("-s", sprintf("%s=%p", k, v))
+    end
+    return rt
   end
-end
 
-def listcommands
-  myname = File.basename($0)
-  $stderr.printf("other available commands:\n")
-  Dir.glob(EMSCRIPTENPATH+'/*.py') do |file|
-    name = File.basename(file).gsub(/\.py$/, "")
-    $stderr.printf("  %s %s\n", myname, name)
+  def check
+    if not File.directory?(@emscriptenpath) then
+      $stderr.printf("emscripten path %p does not exist!\n", @emscriptenpath)
+      exit(1)
+    end
+    if (not File.file?(@python)) || (not File.executable?(@python)) then
+      $stderr.printf("python executable %p is missing, or not executable!\n")
+      exit(1)
+    end
+  end
+
+  def cleanpath
+    removeme = [
+      File.join(ENV["HOME"], "bin"),
+      "/cygdrive/c/cloud/local/dev/clangfix/bin",
+    ]
+    pushme = [
+      "/cygdrive/c/progra~1/llvm/bin",
+    ]
+    stats = []
+    removeme.each do |ritm|
+      if (st = (File.stat(ritm) rescue nil)) != nil then
+        stats.push(st)
+      end
+    end
+    if not stats.empty? then
+      npath = [*pushme]
+      ENV["PATH"].split(":").each do |itm|
+        itm.strip!
+        next if itm.empty?
+        if (st = (File.stat(itm) rescue nil)) != nil then
+          if not stats.include?(st) then
+            npath.push(itm)
+          else
+            $stderr.printf("cleanpath: filtering out %p\n", itm)
+          end
+        end
+      end
+      ENV["PATH"] = npath.join(":")
+    end
+  end
+
+  def listcommands
+    myname = File.basename($0)
+    $stderr.printf("other available commands:\n")
+    Dir.glob(EMSCRIPTENPATH+'/*.py') do |file|
+      name = File.basename(file).gsub(/\.py$/, "")
+      $stderr.printf("  %s %s\n", myname, name)
+    end
   end
 end
 
 begin
   myname = File.basename($0)
-  check
+  em = EmWrap.new
+  em.check
   $stderr.printf("argv: %p\n", ARGV)
   wantedprog = ARGV.shift
   if (wantedprog == nil) || %w(help -h -help --help).include?(wantedprog) then
     $stderr.printf("this script is a wrapper for the windows installation of emscripten.\n")
     $stderr.printf("try using '%s emcc' - or any of these:\n", myname)
-    listcommands
+    em.listcommands
     exit(1)
   else
-    empath = File.join(EMSCRIPTENPATH, (wantedprog + ".py"))
+    empath = File.join(em.emscriptenpath, (wantedprog + ".py"))
     if not File.file?(empath) then
       $stderr.printf("cannot find command %p (would be %p)!\n", wantedprog, empath)
       $stderr.printf("try '%s --help' to get a list of commands.\n", myname)
       exit(1)
     else
-      dv = get_configfile(wantedprog)
-      cmd = [WINPYTHON, empath, *dv, *ARGV]
-      cleanpath()
+      dv = em.get_configfile(wantedprog)
+      cmd = [em.python, empath, *dv, *ARGV]
+      em.cleanpath()
       p ENV["PATH"].split(":")
       $stderr.printf("cmd: %s\n", cmd.join(" "))
       exec(*cmd)

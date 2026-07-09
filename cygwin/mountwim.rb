@@ -6,18 +6,19 @@ require "optparse"
 
 # DISM /Mount-image /imagefile:<path_to_Image_file> {/Index:<image_index> | /Name:<image_name>} /MountDir:<target_mount_directory> [/readonly] /[optimize]}
 
+DISMEXE = "c:/windows/system32/dism.exe"
+
 def cygpath(itm)
   return IO.popen(["cygpath", "-wa", itm]){|io| io.read }.strip
 end
 
 def mountwim(file, dir, opts)
-  dismexe = "c:/windows/system32/dism.exe"
   winfile = cygpath(file)
   windir = cygpath(dir)
   if not File.directory?(windir) then
     FileUtils.mkdir_p(windir)
   end
-  cmd = [dismexe, "/mount-image", "/imagefile:#{winfile}", "/mountdir:#{windir}"]
+  cmd = ["gsudo", DISMEXE, "/mount-image", "/imagefile:#{winfile}", "/mountdir:#{windir}"]
   cmd.push("/index:#{opts.index}") if (opts.index != nil)
   cmd.push("/name:#{opts.name}") if (opts.name != nil)
   cmd.push("/optimize") if opts.optimize
@@ -28,7 +29,7 @@ end
 
 def do_unmount(dir, opts)
   windir = cygpath(dir)
-  cmd = ["c:/windows/system32/dism.exe", "/Unmount-image", "/MountDir:#{windir}"]
+  cmd = ["gsudo", DISMEXE, "/Unmount-image", "/MountDir:#{windir}"]
   if opts.commit then
     cmd.push("/commit")
   else

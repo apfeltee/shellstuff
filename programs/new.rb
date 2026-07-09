@@ -41,9 +41,28 @@ def touchfile(path)
   end
 end
 
-def newfile(path, set_xbit, editafterwards)
+def newfile(path, set_xbit, editafterwards, trycount=0)
   #FileUtils.touch(path, verbose: true)
-  touchfile(path)
+  dn = File.dirname(path)
+  begin
+    touchfile(path)
+  rescue => ex
+    if ex.is_a?(Errno::ENOENT) then
+      warn("attemping to mkdir base %p of %p", dn, path) if (trycount == 0)
+      if trycount == 3 then
+        $stderr.printf("failed to try to create base directory %p too many times. bailing\n", dn)
+        raise ex
+      end
+      begin
+        FileUtils.mkdir_p(dn)
+        # if we're still here, then we can re-call again, that is, try again.
+        return newfile(path, set_xbit, editafterwards, trycount + 1)
+      rescue => subex
+        raise ex
+      end
+    end
+    raise ex
+  end
   if mustwrite?(path) then
     File.write(path, "\n")
   end
@@ -51,7 +70,7 @@ def newfile(path, set_xbit, editafterwards)
     FileUtils.chmod("a+x", path)
   end
   if editafterwards then
-    system("edit", path)
+    system(File.expand_path("~/bin/edit"), path)
   end
 end
 
@@ -95,9 +114,9 @@ begin
           newfile(arg, opts.setxbit, opts.editafter)
         end
       end
-    rescue => e
-      $stderr.puts("uncaught error: (#{e.class}) #{e.message}")
-      exit(1)
+    #rescue => e
+      #$stderr.puts("uncaught error: (#{e.class}) #{e.message}")
+      #exit(1)
     end
   end
 end

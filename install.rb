@@ -30,7 +30,7 @@ def glob(pat, &b)
 end
 
 def symlink_real(from, to)
-  if not File.exists?(to) then
+  if not File.exist?(to) then
     printf("  [ln] from %p to %p ...\n", from, to)
     File.symlink(from, to)
   end
@@ -73,7 +73,7 @@ end
 begin
   dopersonal = false
   OptionParser.new{|prs|
-    prs.on("-h", "-help"){
+    prs.on("-h", "--help"){
       puts(prs.help)
       exit(0)
     }
@@ -94,7 +94,9 @@ begin
 
   ## then, process scripts ...
   do_dir("programs")
+  do_dir("textprocessing")
   do_dir("others")
+  do_dir("reverseeng")
   if is_cygwin then
     do_dir("cygwin")
   elsif is_linux then

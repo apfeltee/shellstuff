@@ -13,11 +13,18 @@ module COMGUI
   end
 end
 
-def exec_and_messagebox(cmd)
-  if system(*cmd) then
+def do_messagebox(message, title=nil)
     args = {title: "command finished"}
     args[:message] = sprintf("command finished:\n%s", cmd.shelljoin)
     COMGUI.messagebox(args)
+
+end
+
+def exec_and_messagebox(cmd)
+  if system(*cmd) then
+    title = "command finished"
+    msg = sprintf("command finished:\n%s", cmd.shelljoin)
+    do_messagebox(msg, title)
   end
 end
 
@@ -48,7 +55,7 @@ begin
       exec_and_messagebox(ARGV)
     else
       args[:message] = ARGV.join(" ")
-      COMGUI.messagebox(args)
+      COMGUI.messagebox(**args)
     end
   end
 end

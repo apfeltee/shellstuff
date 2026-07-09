@@ -9,6 +9,7 @@ class IPInfo
   def initialize(hostn, recurse: true)
     @host = hostn
     @recurse = recurse
+    @hasipv4 = false
     $stdout.puts("info for #{@host.dump}:")
   end
 
@@ -53,12 +54,16 @@ class IPInfo
   def exec_host(hs, check_cmd)
     additional = []
     generic_exec_command("host", hs, check_command: check_cmd) do |line|
+      if line.match?(/ipv4/i) then
+        @hasipv4 = true
+      end
       if @recurse then
         # this will probably(?) only apply to hostnames, but not
         # to ip addresses, so probably unlikely to run into a
         # loop here... i hope?
-        match = line.match(/.+? has address (.*)/)
+        match = line.match(/.+?\s*has\s*address\s*(.*)/)
         if match then
+          @hasipv4 = true
           addr = match[1].strip
           if not additional.include?(addr) then
             additional.push(addr)
@@ -72,7 +77,17 @@ class IPInfo
   end
 
   def exec_geoip(hs)
-    generic_exec_command("geoiplookup", [hs])
+    cmd = "geoiplookup"
+    if hs.include?(":") || !@hasipv4 then
+      cmd = "geoiplookup6"
+    end
+    generic_exec_command(cmd, [hs])
+  end
+
+  def do_host
+    output("Host Information") do
+      exec_host(@host, nil)
+    end
   end
 
   def do_geoip
@@ -81,11 +96,6 @@ class IPInfo
     end
   end
 
-  def do_host
-    output("Host Information") do
-      exec_host(@host, nil)
-    end
-  end
 end
 
 def convert_possible_url(str)

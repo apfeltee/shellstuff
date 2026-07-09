@@ -4,16 +4,40 @@ require "ostruct"
 require "optparse"
 require "stringio"
 
+
+def is_wsl
+  if (ENV["WSL_DISTRO_NAME"]) || (ENV["WTSESSION"]) || File.directory?("/mnt/c/") then
+    if File.file?("/proc/version") then
+      ver = File.read("/proc/version")
+      if ver.match?(/microsoft/i)  then
+        return true
+      end
+    end
+  end
+  return false
+end
+
 class Clipboard
-  CLIPBOARD_PATH = "/dev/clipboard"
   MINCHUNKSIZE = (1024 * 32)
 
   def initialize(options)
+    @devclipboard = "/dev/clipboard"
     @options = options
+    @clipexe = nil
+    @iswsl = is_wsl()
+    if @iswsl then
+      @clipexe = "/mnt/c/windows/system32/clip.exe"
+    end
   end
 
   def verbose(fmt, *args)
     if @options.verbose then
+      $stderr.printf("- %s\n", sprintf(fmt, *args))
+    end
+  end
+
+  def doecho(fmt, *args)
+    if @options.echo then
       $stderr.printf("- %s\n", sprintf(fmt, *args))
     end
   end
@@ -23,21 +47,14 @@ class Clipboard
   end
 
   def print_contents
-    $stdout.puts(File.read(CLIPBOARD_PATH))
+    if @clipexe then
+      $stderr.printf("**error: not supported. sorry**")
+    else
+      $stdout.puts(File.read(@devclipboard))
+    end
   end
 
   def write_chunk(fromfh, tofh, chunk)
-=begin
-    chunk.strip! if @options.strip_input
-    if @options.replacenulls then
-      chunk.gsub!(/\0/, @options.replacenulls)
-    end
-    $stderr.printf("%p\n", chunk) if @options.echo
-    chunksz = fh.syswrite(chunk)
-    if (not @options.strip_input) && (chunk[-1] != "\n") then
-      chunksz += fh.syswrite("\n")
-    end
-=end
     rt = 0
     realdata = nil
     if @options.replacenulls then
@@ -74,9 +91,9 @@ class Clipboard
     return tofh.syswrite(chunk)
   end
 
-  def write_contents(inhandle=$stdin)
+  def write_contents_devcb(inhandle)
     writtenbytes = 0
-    File.open(CLIPBOARD_PATH, "wb") do |fh|
+    File.open(@devclipboard, "wb") do |fh|
       #inhandle.each_line do |chunk|
       while true do
         chunk = inhandle.read(MINCHUNKSIZE)
@@ -89,6 +106,23 @@ class Clipboard
       end
     end
     log("wrote %d bytes in total", writtenbytes)
+  end
+
+  def write_contents_clipexe(inhandle)
+    data = inhandle.read
+    IO.popen([@clipexe], "wb") do |io|
+      doecho("[%-05db]: %p", data.bytesize, data)
+      io.write(data)
+    end
+    $stderr.printf("wrote %d bytes\n", data.bytesize)
+  end
+
+  def write_contents(inhandle=$stdin)
+    if @clipexe != nil then
+      write_contents_clipexe(inhandle)
+    else
+      write_contents_devcb(inhandle)
+    end
   end
 
   def run
@@ -106,7 +140,7 @@ begin
   options = OpenStruct.new(
     replacenulls: nil,
     strip_input: false,
-    echo: false,
+    echo: true,
   )
   OptionParser.new {|prs|
     prs.on("-s", "--[no-]strip", "strip trailing whitespace (default: true)"){|s|

@@ -1,5 +1,6 @@
 #!/usr/bin/ruby --disable-gems
 
+require "rbconfig"
 require "optparse"
 require "ostruct"
 require "shellwords"
@@ -63,6 +64,15 @@ def bstrip(str)
   return bstripr(bstripl(str))
 end
 
+def runcommand(*cmd)
+=begin
+  fork do
+    exec(*cmd)
+  end
+  return true
+=end
+  return system(*cmd)
+end
 
 class Nargs
   def initialize(iothing, opts, command)
@@ -97,7 +107,7 @@ class Nargs
       #pid = fork do
         #Process.exec(com, *args)
         #$stderr.printf("system: %s\n", [com, *args].map(&:dump).join(" "))
-        if not system(com, *args) then
+        if not runcommand(com, *args) then
         #if pid < 0 then
           $stderr.printf("failed to spawn %p\n", com)
           #exit(1)
@@ -254,7 +264,10 @@ class Nargs
         Dir.chdir(thisdir)
       end
       @pids.each{|pid|
-        Process.wait(pid)
+        begin
+          #Process.wait(pid)
+        rescue => ex
+        end
       }
     end
   end

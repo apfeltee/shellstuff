@@ -296,7 +296,8 @@ arj                                   3.10.22-3
                   pkgcount += 1
                   # the gsub gets rid of this bullshit [...] nonsense
                   # seriously, why can't cygwin just use a sane configuration???
-                  tmpstr = tmpdata.join("\n")
+                  tmpstr = tmpdata.join("\n").scrub.gsub(/\\/, "")
+                  #$stderr.printf("yaml:<<<\n%p\n>>>\n", tmpstr)
                   pkgdata = YAML.load(tmpstr)
                   # now write!
                   fh.printf("  %s:\n", name)

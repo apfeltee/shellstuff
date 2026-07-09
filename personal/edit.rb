@@ -5,8 +5,6 @@ require "optparse"
 require "open3"
 require "find"
 
-
-
 if ENV["EDITOR"] != nil then
   enved = ENV["EDITOR"]
   thisfile = File.stat(File.realpath(__FILE__))
@@ -57,12 +55,13 @@ class OpenEditor
     @editor = $EDITOR
     @editme = []
     
-    @iswsl = (ENV["WSL_DISTRO_NAME"] != nil)
-      @iscygwin = check_iscygwin
+    @iswsl = ((ENV["WSL_DISTRO_NAME"] != nil) || File.directory?("/mnt/c"))
+    @iscygwin = check_iscygwin
 
     if @iswsl then
       @editor = wslpath(@editor)
     end
+    $stderr.printf("iswsl=%p, editor=%p\n", @iswsl, @editor)
   end
 
   def complain(fmt, *args)
@@ -125,12 +124,18 @@ class OpenEditor
 
   def calleditor(paths)
     selfcmd = [@editor, *$EDARGS]
-    shellcmd = [*selfcmd, *paths]
+    shellcmd = []
+    if @iswsl then
+      #shellcmd.push("/mnt/c/windows/system32/cmd.exe", "/c")
+      shellcmd.push()
+    end
+    shellcmd.push(*[*selfcmd, *paths])
     $stderr.printf("calling %p with:\n", selfcmd)
     paths.each do |pa|
       $stderr.printf(" + %p\n", pa)
     end
-    system(*shellcmd)
+    $stderr.printf("shellcmd=%p\n", shellcmd)
+    exec(*shellcmd)
   end
 
   def editall(paths)
@@ -169,7 +174,20 @@ class OpenEditor
           complain("file %p is a directory and '--recursive' was not specified", path)
         end
       elsif not File.exist?(path) then
-        complain("file %p does not exist!", path)
+        if @opts.makenew then
+          begin
+            File.write(path, "")
+            if not File.file?(path) then
+              complain("failed to create file for editing...")
+            else
+              return check(path, isrec)
+            end
+          rescue => ex
+            complain("failed to create file: (%s) %s", ex.class.name, ex.message)
+          end
+        else
+          complain("file %p does not exist!", path)
+        end
       else
         complain("file %p cannot be opened because it is not a regular file", path)
       end
@@ -191,10 +209,14 @@ end
 begin
   opts = OpenStruct.new({
     recursive: false,
+    makenew: false,
   })
   OptionParser.new{|prs|
     prs.on("-r", "--recursive", "when argument is a directory, walk recursively"){|_|
       opts.recursive = true
+    }
+    prs.on("-n", "-e", "open file as a new file (like `new -e <file>`)"){|_|
+      opts.makenew = true
     }
   }.parse!
   OpenEditor.new(opts).main(ARGV)

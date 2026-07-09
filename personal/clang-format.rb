@@ -1,4 +1,4 @@
-#!/usr/bin/ruby --disable-gems
+#!/usr/bin/ruby
 
 require "pp"
 
@@ -17,5 +17,5 @@ begin
   newargv = [*moreopts, *ARGV]
   ENV["__WINLLVM_EXECUTABLE"] = "clang-format"
   ARGV.replace(newargv)
-  load File.join(ENV["HOME"], "dev/clangfix/winllvm-exec.rb")
+  load File.join(__dir__, "../..", "clangfix/winllvm-exec.rb")
 end

@@ -4,6 +4,7 @@ require "ostruct"
 require "optparse"
 require "http"
 require "oj"
+require "addressable/uri"
 
 def get(url)
   r = HTTP.follow(true).get(url)
@@ -53,6 +54,9 @@ begin
     exit(1)
   else
     ARGV.each do |a|
+      if a.match?(/^https?:\//) then
+        a = Addressable::URI.parse(a).path.split("/").map(&:strip).reject(&:empty?)[0]
+      end
       GetGithubRepos.new(opts, accpoint, a).printresults
     end
   end

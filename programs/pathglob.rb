@@ -3,11 +3,23 @@
 require "ostruct"
 require "optparse"
 
+def isdir(path)
+  basedir = File.basename(path)
+  if File.directory?(path) then
+    return true
+  end
+  if File.symlink?(path) then
+    dest = File.realpath(path)
+    return File.directory?(dest)
+  end
+  return false
+end
+
 class PathGlob
   def initialize(opts)
     @opts = opts
     @statcache = []
-    @paths = ENV["PATH"].split(":").select{|d| File.directory?(d) }
+    @paths = ENV["PATH"].split(":").select{|d| isdir(d) }
     @dupes = Hash.new{|hash, key| hash[key] = [] }
   end
 
@@ -23,19 +35,27 @@ class PathGlob
     end
   end
 
-  def canskip(item)
+  def cankeep(item)
+    #p item
     if (@opts.nonexe == true) then
-      return false
-    end
-    fs = File.stat(item) rescue nil
-    if (fs != nil) && @statcache.include?(fs) then
       return true
     end
-    @statcache.push(fs)
-    return true if item.match(/\.dll$/i)
-    if File.executable?(item) then
+    fs = File.stat(item) # rescue nil
+    if (fs == nil) then
+      return false
+    else
+      if @statcache.include?(item) then
+        return false
+      end
+    end
+    @statcache.push(item)
+    if item.match(/\.dll$/i) then
       return false
     end
+    if File.executable?(item) then
+      return true
+    end
+    return false
   end
 
   def try_chdir(d, &b)
@@ -51,14 +71,15 @@ class PathGlob
       if File.directory?(path) then
         try_chdir(path) do
           Dir.glob(str, File::FNM_CASEFOLD) do |res|
-            #p res
-            next if canskip(res)
-            if @opts.fullpaths then
-              puts(File.join(path, res))
-            else
-              puts(res)
+            fullp = File.realpath(File.join(path, res))
+            if cankeep(fullp) then
+              if @opts.fullpaths then
+                puts(fullp)
+              else
+                puts(res)
+              end
+              checkdupes(res)
             end
-            checkdupes(res)
           end
         end
       end

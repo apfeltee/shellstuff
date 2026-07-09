@@ -9,11 +9,14 @@ DEFAULT_ENCODING = "ASCII-8BIT"
 ## schemes that also make sense to search for:
 # "data:" for data-uris. often abused, sort of.
 # "file:" for local files. also often abused.
+#=begin
 VALID_SCHEMES = %w(
   ftp sftp http https mailto
   git chrome chrome-extension
-  udp tcp wcm steam
+  udp tcp wcm steam wss 
 )
+#end
+#VALID_SCHEMES = ['\b\w+\b']
 
 REGEXP_LV1 = "://"
 REGEXP_LV2 = Regexp.new(sprintf("(%s):\/\/", VALID_SCHEMES.join("|")), Regexp::IGNORECASE)
@@ -40,8 +43,12 @@ class URLGrep
   def do_file(path)
     if File.file?(path) then
       verbose("processing %p ...", path)
-      File.open(path, "rb") do |fh|
-        iter_io(path, fh)
+      begin
+        File.open(path, "rb") do |fh|
+          iter_io(path, fh)
+        end
+      rescue => ex
+        $stderr.printf("failed to open file: (%s) %s\n", ex.class.name, ex.message)
       end
     else
       $stderr.puts("urlgrep: not a file: #{path.dump}")
@@ -133,6 +140,7 @@ begin
     verbose: false,
     noprint: false,
     outfile: $stdout,
+    listingfile: nil,
     closefile: false,
     encoding: DEFAULT_ENCODING,
     wantstats: false,
@@ -159,7 +167,10 @@ begin
     prs.on("-v", "--verbose", "toggle verbose mode"){|v|
       options.verbose = true
     }
-    prs.on("-o<file>", "--out=<file>", "write to <file>"){|v|
+    prs.on("-l<file>", "--listing=<file>", "read list of files from <file>"){|v|
+      options.listingfile = v
+    }
+    prs.on("-o<file>", "--output=<file>", "--out=<file>", "write to <file>"){|v|
       if v == "-" then
         options.noprint = true
       else
@@ -183,7 +194,16 @@ begin
   prs.parse!
   begin
     ug = URLGrep.new(options)
-    if ARGV.empty? then
+    if options.listingfile then
+      File.open(options.listingfile, "rb") do |fh|
+        fh.each_line do |line|
+          filename = line.rstrip
+          next if filename.empty?
+          ug.do_file(filename)
+        end
+      end
+    end
+    if ARGV.empty? && (options.listingfile == nil) then
       ug.do_stdin
     else
       ARGV.each do |file|

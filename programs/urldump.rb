@@ -11,6 +11,7 @@ require "yaml"
 begin
   require "addressable/uri"
 rescue LoadError
+  require "uri"
 end
 
 module Utils

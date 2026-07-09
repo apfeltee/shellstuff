@@ -4,10 +4,10 @@ require "ostruct"
 require "optparse"
 require "pathname"
 require "fileutils"
-require "find"
 require "shellwords"
 require "open3"
 require "parallel"
+require "fast_find"
 
 # mapping for archives that 7z can't handle (yet)
 # name_of_function => list_of_file_extensions
@@ -22,6 +22,8 @@ EXES = {
   do_lbr: ["lbr"],
   do_sit: ["sit"],
   do_lzx: ["lzx"],
+  do_rar: ["rar"],
+  do_hqx: ["hqx"],
 }
 
 COMPRESSED = %w(
@@ -178,9 +180,18 @@ class UnpackAll
   ## most tools lack the means of specifing an output directory, so
   ## that functionality is emulated through extractor_has_no_output_flag().
   ##
+  def do_hqx(basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag(["unhqx", "%"], basedir, file, odir, idx, ac)
+  end
+
   def do_zip(basedir, file, odir, idx, ac)
     return extractor_has_no_output_flag(["unzip", "-x", "%"], basedir, file, odir, idx, ac)
   end
+
+  def do_rar(basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag(["unrar", "x", "-y", "-p__implement_me__", "%"], basedir, file, odir, idx, ac)
+  end
+
 
   def do_arc(basedir, file, odir, idx, ac)
     return extractor_has_no_output_flag(["arc", "xo", "%"], basedir, file, odir, idx, ac)
@@ -198,7 +209,7 @@ class UnpackAll
   end
 
   def do_zoo(basedir, file, odir, idx, ac)
-    return extractor_has_no_output_flag(["zoo", "x", "%"], basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag(["zoo", "xOO", "%"], basedir, file, odir, idx, ac)
   end
   
   def do_sit(basedir, file, odir, idx, ac)
@@ -333,7 +344,7 @@ class UnpackAll
 
   def walk(dir)
     $stderr.printf("scanning %p ...\n", dir)
-    Find.find(dir) do |path|
+    FastFind.find(dir) do |path|
       next unless File.file?(path)
       addfile(path)
     end
@@ -395,7 +406,11 @@ def findexe(name, mustfail, wantednames)
 end
 
 def find7z()
-  return findexe("sevenzip", true, ["win7z", "7z.exe"])
+  names = ["7z.exe", "7z"]
+  #if not ENV["WSL_DISTRO_NAME"] then
+  #  names.prepend("win7z")
+  #end
+  return findexe("sevenzip", true, names)
 end
 
 def findmvsingle()
@@ -419,11 +434,11 @@ begin
       puts(prs.help)
       exit(0)
     }
-    prs.on("-i<file>"){|v|
+    prs.on("-i<file>", "read input file listing from <file>"){|v|
       opts.inputfile = v
     }
     prs.on("-r", "--regex", "print regex used to find files, and exit"){
-      puts(PKGRE)
+      print(PKGRE)
       exit(0)
     }
     prs.on("-z<path>", "-x<path>", "--7z=<path>", "specify path to 7z"){|v|
@@ -468,10 +483,18 @@ begin
   else
     if opts.inputfile != nil then
       File.foreach(opts.inputfile) do |line|
+        line.scrub!
         line.strip!
         next if line.empty?
-        next unless File.file?(line)
-        ua.addfile(line)
+        path = line
+        # input file is a listing that includes sizes (i.e., `6.13M<tab>./some/path/file.blah`)
+        if (m=line.match(/^\s*[\d\.]+(k|g|b|m)+\t(?<file>.*)/i)) != nil then
+          path = m["file"]
+        end
+        next unless File.file?(path)
+        #if ua.find_extractor(path) != nil then
+          ua.addfile(path)
+        #end
       end
     end
     ARGV.each do |arg|

@@ -1,8 +1,9 @@
 #!/usr/bin/ruby
 
 require "optparse"
-require "find"
 require "fileutils"
+require "find"
+require "fast_find"
 
 MAX_LEVELS = 800
 #NEWNAME_TEMPLATE = "%<stem>s (%<index>d)%<ext>s"
@@ -60,6 +61,9 @@ def make_newname(srcdir, item)
   base = File.basename(item)
   ext = File.extname(base)
   stem = File.basename(base, ext)
+  if (stem == "") || (stem == nil) then
+    stem = ext
+  end
   Dir.chdir(dir) do
     while ci != MAX_LEVELS do
       #nbase = "#{stem}#{ci+1}#{ext}"
@@ -132,9 +136,11 @@ end
 class Deep
   def initialize
     @counter = 0
+    @executor = Concurrent::FixedThreadPool.new(8, idletime: 90)
   end
 
   def deep(dir)
+    #FastFind.find(dir, executor: @executor) do |path|
     Find.find(dir) do |path|
       next unless File.directory?(path)
       next if File.symlink?(path)

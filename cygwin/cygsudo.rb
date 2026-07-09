@@ -1,5 +1,4 @@
 #!/usr/bin/ruby
-#exec "$@"
 
 begin
   # cygstart --action=runas

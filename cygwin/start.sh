@@ -1,3 +1,3 @@
 #!/bin/bash
 
-exec cmd /c start "$@"
+exec c:/windows/system32/cmd /c start "$@"

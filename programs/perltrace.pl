@@ -1,24 +1,29 @@
-#!/usr/bin/perl -d:DumpTrace
+#!/usr/bin/perl
 
 # this is a really weird hack, that lets you trace perl.
 # obviously needs Devel::DumpTrace.
 
 BEGIN {
+    our $^T = 0x20;
+    no warnings;
+    use DB;
+    #use diagnostics;
     use Devel::DumpTrace;
+    $DB::signal = 1;
+
+
     Devel::DumpTrace->import();
-    $Devel::DumpTrace::TRACE = 0;
+    $Devel::DumpTrace::TRACE = 1;
     #printf("hello\n");
     #$Devel::DumpTrace::DUMPTRACE_COLOR = Term::ANSIColor::color("bold yellow on_black");
     #$Devel::DumpTrace::DUMPTRACE_RESET = Term::ANSIColor::color("reset");
-}
+};
 
-
-no warnings 'uninitialized';
 #use strict;
 #use warnings;
 #use autodie;
 #use diagnostics;
-use Devel::DumpTrace;
+#use Devel::DumpTrace;
 # there's a bug(?) in Devel::DumpTrace::PPI that complains a little bit
 #use Term::ANSIColor;
 #use Data::Dumper;

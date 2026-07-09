@@ -119,30 +119,53 @@ class App
       end
     end
 =end
-      cmd = ["grep", "-rP"]
+      # NB. default grep does not permit using more than one pattern with perl-style regular expressions.
+      # but pcregrep does, so... we use pcregrep.
+      cmd = ["grep", "-HrP"]
+      #cmd = ["pcregrep", "-Hr"]
+
       if @opts.icase then
         cmd.push("-i")
       end
-      if @opts.n then
+      if @opts.withlinenumbers then
         cmd.push("-n")
       end
-      if @opts.a then
+      if @opts.forcetext then
         cmd.push("-a")
       end
       @opts.patterns.each do |pa|
-        cmd.push(pa.pattern)
+        cmd.push("-e", pa.pattern)
+      end
+      if @opts.context != nil then
+        cmd.push("-C#{@opts.context}")
+      end
+      if @opts.after != nil then
+        cmd.push("-A#{@opts.after}")
+      end
+      if @opts.before != nil then
+        cmd.push("-B#{@opts.before}")
+      end
+      if @opts.maxcount != nil then
+        cmd.push("-m#{@opts.maxcount}")
       end
       cmd.push(*locations)
-      $stderr.printf("command: %s\n", cmd.map{|s| s }.join(" "))
+      cmdstr = cmd.map{|s| s }.join(" ")
+      if cmdstr.length > 120 then
+        cmdstr = cmdstr[0 .. 110] + " ..."
+      end
+      $stderr.printf("command: <<<%s>>>\n", cmdstr)
       exec(*cmd)
   end
 end
 
 begin
   opts = OpenStruct.new({
-    icase: true,
+    icase: false,
     asrx: true,
     patterns: [],
+    maxcount: nil,
+    withlinenumbers: false,
+    forcetext: false,
   })
   OptionParser.new{|prs|  
     prs.on("-h", "--help"){
@@ -151,6 +174,9 @@ begin
     }
     prs.on("-i", "--icase"){
       opts.icase = true
+    }
+    prs.on("-m<n>"){|v|
+      opts.maxcount = v.to_i
     }
     prs.on("-f<str>", "--hollerith=<str>"){|v|
       opts.patterns.push(Pattern.make_hollerith(v, opts.icase))
@@ -167,18 +193,31 @@ begin
     prs.on("--regex"){
       opts.asrx = true
     }
+    prs.on("-C<n>", "--context=<n>"){|v|
+      opts.context = v
+    }
+    prs.on("-A<n>", "--after=<n>"){|v|
+      opts.after = v
+    }
+    prs.on("-B<n>", "--before=<n>"){|v|
+      opts.before = v
+    }
     prs.on("-n"){
-      opts.n = true
+      opts.withlinenumbers = true
     }
     prs.on("-a"){
-      opts.a = true
+      opts.forcetext = true
     }
   }.parse!
   if opts.patterns.empty? then
     $stderr.printf("not enough args\n")
     exit(1)
   else
-    App.new(opts).search(ARGV)
+    items = ARGV
+    if items.empty? then
+      items.push(".")
+    end
+    App.new(opts).search(items)
   end
   
 end

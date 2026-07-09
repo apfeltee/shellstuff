@@ -18,6 +18,91 @@ def size_to_readable(size)
   return sprintf('%.1f%s', (size.to_f / (1024 ** exp)), units[exp])
 end
 
+# The +Find+ module supports the top-down traversal of a set of file paths.
+#
+# For example, to total the size of all files under your home directory,
+# ignoring anything in a "dot" directory (e.g. $HOME/.ssh):
+#
+#   require 'find'
+#
+#   total_size = 0
+#
+#   Find.find(ENV["HOME"]) do |path|
+#     if FileTest.directory?(path)
+#       if File.basename(path).start_with?('.')
+#         Find.prune       # Don't look any further into this directory.
+#       else
+#         next
+#       end
+#     else
+#       total_size += FileTest.size(path)
+#     end
+#   end
+#
+module Find
+
+  #
+  # Calls the associated block with the name of every file and directory listed
+  # as arguments, then recursively on their subdirectories, and so on.
+  #
+  # Returns an enumerator if no block is given.
+  #
+  # See the +Find+ module documentation for an example.
+  #
+  def find(*paths, ignore_error: true) # :yield: path
+    block_given? or return enum_for(__method__, *paths, ignore_error: ignore_error)
+
+    fs_encoding = Encoding.find("filesystem")
+
+    paths.collect!{|d| raise Errno::ENOENT, d unless File.exist?(d); d.dup}.each do |path|
+      path = path.to_path if path.respond_to? :to_path
+      enc = path.encoding == Encoding::US_ASCII ? fs_encoding : path.encoding
+      ps = [path]
+      while file = ps.shift
+        catch(:prune) do
+          yield file.dup
+          begin
+            s = File.lstat(file)
+          rescue Errno::ENOENT, Errno::EACCES, Errno::ENOTDIR, Errno::ELOOP, Errno::ENAMETOOLONG
+            raise unless ignore_error
+            next
+          end
+          if s.directory? then
+            Dir.open(file) do |hnd|
+              while (ent = hnd.read) != nil do
+                next if ((ent == ".") || (ent == ".."))
+                fp = File.join(file, ent)
+                #p fp
+                ps.unshift(fp)
+                #if File.directory?(fp) then
+                  #ps.unshift(fp)
+                #else
+                  #yield fp
+                #end
+              end  
+            end
+          end
+        end
+      end
+    end
+    nil
+  end
+
+  #
+  # Skips the current file or directory, restarting the loop with the next
+  # entry. If the current file is a directory, that directory will not be
+  # recursively entered. Meaningful only within the block associated with
+  # Find::find.
+  #
+  # See the +Find+ module documentation for an example.
+  #
+  def prune
+    throw :prune
+  end
+
+  module_function :find, :prune
+end
+
 class FindCommand
   def initialize
     @cmd = ["find"]
@@ -87,6 +172,84 @@ class FindCommand
         end
         #$stderr.printf("calling: %p\n", ln)
         b.call(ln)
+      end
+    end
+  end
+end
+
+class FindRuby
+  def initialize
+    @dirs = []
+    @type = nil
+    @predinames = []
+    @prediregex = []
+    @actions = []
+  end
+
+  def type(c)
+    @type = c
+  end
+
+  def dir(*a)
+    @dirs.push(*a)
+  end
+
+  def iname(*a)
+    @predinames.push(*a)
+  end
+
+  def iregex(*rxes)
+
+  end
+
+  def build
+
+  end
+
+  def isok_inames(path)
+    flags = (if @ignorecase then File::FNM_CASEFOLD else 0 end)
+    base = File.basename(path).scrub
+    @predinames.each do |pat|
+      rt = File.fnmatch(pat, base, flags)
+      #$stderr.printf("isok_inames: pat=%p, base=%p, rt=%p\n", pat, base, rt)
+      if rt then
+        return true
+      end
+    end
+    return false
+  end
+
+  def isok(path)
+    if @type != nil then
+      isfile = File.file?(path)
+      isdir = File.directory?(path)
+      #$stderr.printf("path=%p; @type=%p; isfile=%p; isdir=%p\n", path, @type, isfile, isdir)
+      if (@type == 'f') then
+        if !isfile then
+          return false
+        end
+      elsif (@type == 'd') then
+        if !isdir then
+          return false
+        end
+      else
+        $stderr.printf("unimplemented type %p\n", @type)
+      end
+    end
+    if @predinames.length > 0 then
+      return isok_inames(path)
+    end
+    return true
+  end
+
+  def run(&b)
+    dirs = @dirs
+    if dirs.empty? then
+      dirs.push(".")
+    end
+    Find.find(*@dirs) do |item|
+      if isok(item)
+        b.call(item)
       end
     end
   end
@@ -215,9 +378,8 @@ class FileFind
   end
 
   def main(dirs)
-    fc = FindCommand.new
-    fc.dir(*dirs)
-    fc.type(
+    @fc.dir(*dirs)
+    @fc.type(
       if @opts.onlyfiles then
         'f'
       elsif @opts.onlydirs then
@@ -227,11 +389,11 @@ class FileFind
       end
     )
     if @opts.asregex then
-      fc.iregex(*@opts.patterns)
+      @fc.iregex(*@opts.patterns)
     else
-      fc.iname(*@opts.patterns)
+      @fc.iname(*@opts.patterns)
     end
-    fc.run do |path|
+    @fc.run do |path|
       if ismatch(path) then
         if @delfiles then
           delfile(path)

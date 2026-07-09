@@ -9,12 +9,15 @@ begin
       $stdin.each_line do |line|
         line.strip!
         next if line.empty?
-        m = line.match(/^\s*#\s*define\s*(?<ident>\w+)\s+(?<value>.*)/)
+        m = line.match(/^\s*#\s*define\s*(?<ident>\w+)\s+(?<value>.+)\s*(?<comment>(\/\/.*$|\/\*.*\*\/))?/)
         if m == nil then
           $stderr.printf("warning: failed to parse %p\n", line)
           puts(line)
         else
-          printf("%s = %s,\n", m["ident"].strip, m["value"].strip)
+          iden = m["ident"].strip
+          value = m["value"].strip
+          com = " " + (m["comment"] || "").strip
+          printf("%s = %s,%s\n", iden, value, com)
         end
       end
     rescue Interrupt
