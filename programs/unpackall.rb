@@ -16,6 +16,7 @@ EXES = {
   #do_rar: ["rar"],
   do_lzh: ["lzh", "lha"],
   do_zoo: ["zoo"],
+  do_rpm: ["rpm"],
   # really old archives use .ark, but are actually .arc
   do_arc: ["arc", "ark"],
   # ANCIENT SHIT
@@ -116,8 +117,11 @@ class UnpackAll
     return nil
   end
 
-  def shsystem(cmd, idx, ac)
+  def shsystem(cmd, idx, ac, isstring)
     $stdout.printf("[%-5d of %-5d]\n", idx+1, ac)
+    if isstring then
+      return system(cmd)
+    end
     return system(*cmd)
   end
 
@@ -144,6 +148,7 @@ class UnpackAll
   # which becomes ["foo", "-bar", "somefile.foo"]. the "%" can
   # appear whereever, obviously.
   def extractor_has_no_output_flag(execmd, basedir, file, odir, idx, ac)
+    isstring = false
     FileUtils.mkdir_p(odir)
     rfile = File.absolute_path(file)
     absodir = File.absolute_path(File.join(basedir, odir))
@@ -155,14 +160,26 @@ class UnpackAll
     begin
       Dir.chdir(odir) do
         $stderr.printf("rfile: %p\n", rfile)
-        realcmd = execmd.map{|v|
-          if v == "%" then
-            relfile
-          else
-            v
+        realcmd = nil
+        if (execmd.class == String) || ((execmd.class == Array) && (execmd.length == 1)) then
+          if (execmd.class == Array) && (execmd.length == 1) then
+            execmd = execmd[0]
           end
-        }
-        return shsystem(realcmd, idx, ac)
+          isstring = true
+          realcmd = execmd.gsub(/%/, relfile)
+        elsif execmd.class == Array then
+          realcmd = execmd.map{|v|
+            if v == "%" then
+              relfile
+            else
+              v
+            end
+          }
+        else
+          $stderr.printf("extractor_has_no_output_flag() first argument must be string or array!")
+          raise "unknowntype"
+        end
+        return shsystem(realcmd, idx, ac, isstring)
       end
     ensure
       if File.empty?(odir) then
@@ -180,6 +197,10 @@ class UnpackAll
   ## most tools lack the means of specifing an output directory, so
   ## that functionality is emulated through extractor_has_no_output_flag().
   ##
+  def do_rpm(basedir, file, odir, idx, ac)
+    return extractor_has_no_output_flag("rpm2cpio % | cpio -idmv", basedir, file, odir, idx, ac)
+  end
+
   def do_hqx(basedir, file, odir, idx, ac)
     return extractor_has_no_output_flag(["unhqx", "%"], basedir, file, odir, idx, ac)
   end
@@ -205,7 +226,7 @@ class UnpackAll
     cmd = [
       "lha", "xfw=#{odir}", file
     ]
-    return shsystem(cmd, idx, ac)
+    return shsystem(cmd, idx, ac, false)
   end
 
   def do_zoo(basedir, file, odir, idx, ac)
@@ -238,7 +259,7 @@ class UnpackAll
     end
     cmd.push("-o#{odir}")
     cmd.push(file)
-    return shsystem(cmd, idx, ac)
+    return shsystem(cmd, idx, ac, false)
   end
 
   def procitem(name, recv, *args, &b)
